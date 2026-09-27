@@ -13,6 +13,7 @@ use office_toolkit::drawing::{
 };
 use office_toolkit::powerpoint::{
     EMU_PER_INCH, PlaceholderKind, Picture, PictureFormat, Presentation, Shape, ShapeGroup,
+    SlideTable,
 };
 
 use crate::error::Error;
@@ -103,6 +104,48 @@ pub struct PicInfo {
     pub size_bytes: usize,
 }
 
+/// One cell inside an OpenXML table.
+#[derive(Debug, Clone, Serialize)]
+pub struct TableCellInfo {
+    /// Text paragraphs joined by `\n`; `None` if cell has no text.
+    pub text: Option<String>,
+    /// Text runs inside the cell.
+    pub runs: Vec<TextRunInfo>,
+    /// Background fill of the cell as CSS color or token.
+    pub fill: Option<String>,
+    /// Top border outline, if explicitly specified.
+    pub border_top: Option<LineInfo>,
+    /// Bottom border outline, if explicitly specified.
+    pub border_bottom: Option<LineInfo>,
+    /// Left border outline, if explicitly specified.
+    pub border_left: Option<LineInfo>,
+    /// Right border outline, if explicitly specified.
+    pub border_right: Option<LineInfo>,
+    /// Column span (default 1).
+    pub col_span: u32,
+    /// Row span (default 1).
+    pub row_span: u32,
+}
+
+/// Extracted OpenXML table structure (`a:tbl`).
+#[derive(Debug, Clone, Serialize)]
+pub struct TableInfo {
+    /// Width of each column in EMUs.
+    pub column_widths_emu: Vec<i64>,
+    /// Height of each row in EMUs.
+    pub row_heights_emu: Vec<i64>,
+    /// 2D grid of rows and cells (`[row_idx][col_idx]`).
+    pub rows: Vec<Vec<TableCellInfo>>,
+    /// Whether the table style has first row formatting enabled.
+    pub first_row: bool,
+    /// Whether the table style has first column formatting enabled.
+    pub first_col: bool,
+    /// Whether the table style has banded rows enabled.
+    pub band_rows: bool,
+    /// Whether the table style has banded columns enabled.
+    pub band_cols: bool,
+}
+
 /// Serializable view of one shape. For a group, `children` holds the nested
 /// shapes with their bounds already remapped out of the group's child
 /// coordinate space into slide coordinates.
@@ -134,6 +177,9 @@ pub struct ShapeInfo {
     /// Embedded image data, only for a `picture` shape.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pic: Option<PicInfo>,
+    /// Extracted table content and grid structure, only for a `table` shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub table: Option<TableInfo>,
     /// Nested shapes, only for a group.
     pub children: Option<Vec<ShapeInfo>>,
 }
@@ -304,6 +350,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                     .map(|tb| flatten_runs(tb, default_size))
                     .unwrap_or_default(),
                 pic: None,
+                table: None,
                 children: None,
             }
         }
@@ -331,6 +378,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                 .map(line_info),
             runs: Vec::new(),
             pic: Some(pic_info(p)),
+            table: None,
             children: None,
         },
         Shape::Chart(c) => ShapeInfo {
@@ -349,6 +397,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            table: None,
             children: None,
         },
         Shape::Group(g) => {
@@ -375,6 +424,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                 line: None,
                 runs: Vec::new(),
                 pic: None,
+                table: None,
                 children: Some(children),
             }
         }
@@ -396,6 +446,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: c.properties.line.as_ref().map(line_info),
             runs: Vec::new(),
             pic: None,
+            table: None,
             children: None,
         },
         Shape::Table(t) => ShapeInfo {
@@ -414,6 +465,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            table: Some(table_info(t)),
             children: None,
         },
         Shape::Media(m) => ShapeInfo {
@@ -432,8 +484,63 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            table: None,
             children: None,
         },
+    }
+}
+
+fn table_info(t: &SlideTable) -> TableInfo {
+    let row_heights_emu = t.rows.iter().map(|r| r.height_emu).collect();
+    let rows = t
+        .rows
+        .iter()
+        .map(|r| {
+            r.cells
+                .iter()
+                .map(|cell| {
+                    let text = cell.text_body.as_ref().map(text_body_to_string);
+                    let runs = cell
+                        .text_body
+                        .as_ref()
+                        .map(|tb| flatten_runs(tb, None))
+                        .unwrap_or_default();
+                    let (fill, border_top, border_bottom, border_left, border_right) =
+                        if let Some(props) = &cell.properties {
+                            (
+                                props.fill.as_ref().map(fill_to_css),
+                                props.border_top.as_ref().map(line_info),
+                                props.border_bottom.as_ref().map(line_info),
+                                props.border_left.as_ref().map(line_info),
+                                props.border_right.as_ref().map(line_info),
+                            )
+                        } else {
+                            (None, None, None, None, None)
+                        };
+                    TableCellInfo {
+                        text,
+                        runs,
+                        fill,
+                        border_top,
+                        border_bottom,
+                        border_left,
+                        border_right,
+                        col_span: cell.horizontal_span.unwrap_or(1),
+                        row_span: cell.vertical_span.unwrap_or(1),
+                    }
+                })
+                .collect()
+        })
+        .collect();
+
+    TableInfo {
+        column_widths_emu: t.column_widths_emu.clone(),
+        row_heights_emu,
+        rows,
+        first_row: t.style_first_row,
+        first_col: t.style_first_column,
+        band_rows: t.style_band_rows,
+        band_cols: t.style_band_columns,
     }
 }
 

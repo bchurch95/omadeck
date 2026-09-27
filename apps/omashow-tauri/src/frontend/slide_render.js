@@ -40,6 +40,92 @@ function drawShapes(container, shapes, pxPerEmu, pxPerInch, mini) {
       container.appendChild(pic);
       continue;
     }
+    if (sh.kind === "table") {
+      if (!sh.bounds || !sh.table) continue;
+      const tblWrap = document.createElement("div");
+      tblWrap.className = "slide-table-wrap slide-shape";
+      tblWrap.dataset.shapeId = sh.id;
+      place(tblWrap, sh.bounds, pxPerEmu);
+
+      const tableEl = document.createElement("table");
+      tableEl.className = "slide-table";
+      tableEl.style.width = "100%";
+      tableEl.style.height = "100%";
+      tableEl.style.borderCollapse = "collapse";
+      tableEl.style.tableLayout = "fixed";
+
+      // Colgroup
+      if (sh.table.column_widths_emu && sh.table.column_widths_emu.length) {
+        const colgroup = document.createElement("colgroup");
+        for (const wEmu of sh.table.column_widths_emu) {
+          const col = document.createElement("col");
+          col.style.width = (wEmu * pxPerEmu) + "px";
+          colgroup.appendChild(col);
+        }
+        tableEl.appendChild(colgroup);
+      }
+
+      const tbody = document.createElement("tbody");
+      sh.table.rows.forEach((row, rowIdx) => {
+        const tr = document.createElement("tr");
+        if (sh.table.row_heights_emu && sh.table.row_heights_emu[rowIdx]) {
+          tr.style.height = (sh.table.row_heights_emu[rowIdx] * pxPerEmu) + "px";
+        }
+        row.forEach((cell) => {
+          const td = document.createElement("td");
+          if (cell.col_span > 1) td.colSpan = cell.col_span;
+          if (cell.row_span > 1) td.rowSpan = cell.row_span;
+
+          // Padding and typography
+          td.style.padding = (mini ? "1px 2px" : "4px 6px");
+          td.style.verticalAlign = "top";
+          td.style.boxSizing = "border-box";
+
+          // Border formatting
+          const defaultBorder = mini ? "0.5px solid rgba(255,255,255,0.15)" : "1px solid rgba(255,255,255,0.2)";
+          td.style.borderTop = cell.border_top && cell.border_top.color
+            ? `${Math.max(1, (cell.border_top.width_emu || 9525) * pxPerEmu)}px solid ${themeColor(cell.border_top.color)}`
+            : defaultBorder;
+          td.style.borderBottom = cell.border_bottom && cell.border_bottom.color
+            ? `${Math.max(1, (cell.border_bottom.width_emu || 9525) * pxPerEmu)}px solid ${themeColor(cell.border_bottom.color)}`
+            : defaultBorder;
+          td.style.borderLeft = cell.border_left && cell.border_left.color
+            ? `${Math.max(1, (cell.border_left.width_emu || 9525) * pxPerEmu)}px solid ${themeColor(cell.border_left.color)}`
+            : defaultBorder;
+          td.style.borderRight = cell.border_right && cell.border_right.color
+            ? `${Math.max(1, (cell.border_right.width_emu || 9525) * pxPerEmu)}px solid ${themeColor(cell.border_right.color)}`
+            : defaultBorder;
+
+          // Fill / background
+          const cellFill = themeColor(cell.fill);
+          if (cellFill && !NON_SOLID_FILLS.has(cellFill)) {
+            td.style.background = cellFill;
+          } else if (sh.table.first_row && rowIdx === 0) {
+            td.style.background = "rgba(99, 102, 241, 0.25)";
+            td.style.fontWeight = "600";
+          } else if (sh.table.band_rows && rowIdx % 2 === 1) {
+            td.style.background = "rgba(255, 255, 255, 0.04)";
+          }
+
+          if (cell.runs && cell.runs.length) {
+            td.style.fontSize = ptToPx(14, pxPerInch, mini);
+            const aligned = cell.runs.find((r) => r.alignment);
+            if (aligned) td.style.textAlign = aligned.alignment;
+            appendRuns(td, cell.runs, pxPerInch, mini);
+          } else if (cell.text) {
+            td.style.fontSize = ptToPx(14, pxPerInch, mini);
+            td.textContent = cell.text;
+          }
+
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      tableEl.appendChild(tbody);
+      tblWrap.appendChild(tableEl);
+      container.appendChild(tblWrap);
+      continue;
+    }
     if (sh.kind !== "autoshape" || !sh.bounds) continue;
     const el = document.createElement("div");
     el.className = "slide-shape";

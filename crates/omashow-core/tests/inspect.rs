@@ -423,3 +423,49 @@ fn picture_media_data_roundtrips() {
         "embedded media must roundtrip byte-for-byte"
     );
 }
+
+#[test]
+fn table_extraction_and_grid_info() {
+    use office_toolkit::powerpoint::{SlideTable, TableCell, TableRow};
+
+    let tb = |s: &str| TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text(s)));
+
+    let cell1 = TableCell::new().with_text_body(tb("Header 1"));
+    let cell2 = TableCell::new().with_text_body(tb("Header 2"));
+    let row1 = TableRow::new(300_000).with_cell(cell1).with_cell(cell2);
+
+    let cell3 = TableCell::new().with_text_body(tb("Data 1"));
+    let cell4 = TableCell::new().with_text_body(tb("Data 2"));
+    let row2 = TableRow::new(250_000).with_cell(cell3).with_cell(cell4);
+
+    let table = SlideTable::new(99, "Test Table", 2_000_000, 550_000)
+        .with_offset(500_000, 600_000)
+        .with_column_widths(vec![1_000_000, 1_000_000])
+        .with_row(row1)
+        .with_row(row2)
+        .with_style_first_row(true)
+        .with_style_band_rows(true);
+
+    let mut pres = Presentation::new();
+    let slide = Slide::new().with_shape(Shape::Table(table));
+    pres.slides.push(slide);
+
+    let shapes = get_slide_shapes(&pres, 0).expect("slide shapes");
+    assert_eq!(shapes.len(), 1);
+    let shape = &shapes[0];
+    assert_eq!(shape.kind, "table");
+    assert_eq!(shape.name, "Test Table");
+
+    let table_info = shape.table.as_ref().expect("table info exists");
+    assert_eq!(table_info.column_widths_emu, vec![1_000_000, 1_000_000]);
+    assert_eq!(table_info.row_heights_emu, vec![300_000, 250_000]);
+    assert_eq!(table_info.rows.len(), 2);
+    assert_eq!(table_info.rows[0].len(), 2);
+    assert_eq!(table_info.rows[0][0].text.as_deref(), Some("Header 1"));
+    assert_eq!(table_info.rows[0][1].text.as_deref(), Some("Header 2"));
+    assert_eq!(table_info.rows[1][0].text.as_deref(), Some("Data 1"));
+    assert_eq!(table_info.rows[1][1].text.as_deref(), Some("Data 2"));
+    assert!(table_info.first_row);
+    assert!(table_info.band_rows);
+}
+
