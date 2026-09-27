@@ -1,4 +1,9 @@
-# Autonomous Agent Directives for Omashow
+# Autonomous Agent Directives for OmaDeck (formerly Omashow)
+
+## Project Identity & Branding: OmaDeck
+- The application display name and branding is **OmaDeck** (to distinguish from the upstream C++/Qt6 tool `omashow`).
+- The repository has integrated upstream design assets, icons, screenshots, and CLI reference specs in `upstream_assets/` (`examples/`, `icons/`, `docs/screenshots/`, and `docs/cli.md`). Consult these for UI and CLI alignment.
+- Keep internal Rust crate names as they are to avoid churn, but user-facing UI, titles, exports, and Tauri bundle names must consistently reflect **OmaDeck**.
 
 <!-- antislop:start -->
 ## antislop

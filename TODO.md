@@ -1,4 +1,4 @@
-# Omashow Development Backlog
+# OmaDeck Development Backlog
 
 ## Milestone 1: Robust Lossless PPTX Roundtripping (Complete)
 - [x] Run and verify `crates/omashow-core/examples/verify_real.rs` against real `python-pptx` decks (`/tmp/omashow-rt/real.pptx`).
