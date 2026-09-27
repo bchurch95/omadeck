@@ -28,7 +28,7 @@ const TEMPLATE: &str = r#"<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__TITLE__ · Omashow</title>
+<title>__TITLE__ · OmaDeck</title>
 <style>
 html,body{height:100%;margin:0;background:#14151a;overflow:hidden}
 #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}

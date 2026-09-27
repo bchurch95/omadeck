@@ -40,7 +40,7 @@ impl PptxDocument {
         let w_mm = emu_to_mm(dims.width_emu);
         let h_mm = emu_to_mm(dims.height_emu);
         let (doc, first_page, first_layer) =
-            PdfDocument::new("Omashow presentation", w_mm, h_mm, "slide 1");
+            PdfDocument::new("OmaDeck presentation", w_mm, h_mm, "slide 1");
 
         {
             let page = doc.get_page(first_page).get_layer(first_layer);

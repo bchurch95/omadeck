@@ -1,4 +1,4 @@
-# Omashow
+# OmaDeck
 
 Modern PowerPoint clone built in Rust.
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Omashow",
+  "productName": "OmaDeck",
   "version": "0.1.2",
-  "identifier": "dev.omashow.desktop",
+  "identifier": "dev.omadeck.desktop",
   "build": {
     "frontendDist": "../src/frontend"
   },
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Omashow",
+        "title": "OmaDeck",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
