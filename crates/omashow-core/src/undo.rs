@@ -38,6 +38,13 @@ pub enum UndoCommand {
         after: Option<TextBody>,
         description: String,
     },
+    /// One slide's explicit background fill, captured before and after.
+    Background {
+        slide: usize,
+        before: Option<office_toolkit::drawing::Fill>,
+        after: Option<office_toolkit::drawing::Fill>,
+        description: String,
+    },
 }
 
 impl UndoCommand {
@@ -57,6 +64,11 @@ impl UndoCommand {
             UndoCommand::Notes { slide, after, .. } => {
                 if let Some(s) = pres.slides.get_mut(*slide) {
                     s.notes = after.clone();
+                }
+            }
+            UndoCommand::Background { slide, after, .. } => {
+                if let Some(s) = pres.slides.get_mut(*slide) {
+                    s.background = after.clone();
                 }
             }
         }
@@ -80,6 +92,11 @@ impl UndoCommand {
                     s.notes = before.clone();
                 }
             }
+            UndoCommand::Background { slide, before, .. } => {
+                if let Some(s) = pres.slides.get_mut(*slide) {
+                    s.background = before.clone();
+                }
+            }
         }
     }
 
@@ -88,7 +105,8 @@ impl UndoCommand {
         match self {
             UndoCommand::Slides { description, .. }
             | UndoCommand::Shapes { description, .. }
-            | UndoCommand::Notes { description, .. } => description,
+            | UndoCommand::Notes { description, .. }
+            | UndoCommand::Background { description, .. } => description,
         }
     }
 }

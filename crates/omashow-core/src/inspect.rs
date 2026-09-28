@@ -50,6 +50,14 @@ pub fn slide_dimensions(pres: &Presentation) -> SlideDimensions {
     }
 }
 
+/// The slide's custom background fill (`<p:bg>`) as a CSS value — a solid
+/// color, or the token "none"/"gradient"/"pattern"/"image" for non-solid
+/// fills. `None` when the slide inherits its background from its layout.
+pub fn slide_background(pres: &Presentation, slide: usize) -> Result<Option<String>, Error> {
+    let s = pres.slides.get(slide).ok_or(Error::OutOfRange(slide))?;
+    Ok(s.background.as_ref().map(fill_to_css))
+}
+
 /// Axis-aligned bounding box in slide coordinates (top-left origin, x right,
 /// y down), in EMUs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

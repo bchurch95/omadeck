@@ -5,7 +5,8 @@
 use std::io::Cursor;
 
 use omashow_core::{
-    get_slide_shapes, slide_count, slide_dimensions, BoundingBox, LineInfo, PptxDocument,
+    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo,
+    PptxDocument,
 };
 use office_toolkit::drawing::{
     Color, Fill, Line, ShapeProperties, TextAlign, TextBody, TextParagraph, TextParagraphProperties,
@@ -543,5 +544,23 @@ fn connector_without_connections_is_floating() {
     let info = cx.connector.as_ref().expect("connector info present even when floating");
     assert!(info.start_connection.is_none());
     assert!(info.end_connection.is_none());
+}
+
+#[test]
+fn slide_background_extraction() {
+    // A slide carrying a solid p:bg fill reports it as CSS hex; a layout-
+    // inheriting slide reports None.
+    let mut pres = Presentation::new();
+    pres.slides.push(
+        Slide::new().with_background(Fill::Solid(Color::Rgb("336699".to_string()))),
+    );
+    pres.slides.push(Slide::new());
+
+    assert_eq!(
+        slide_background(&pres, 0).expect("solid background"),
+        Some("#336699".to_string())
+    );
+    assert_eq!(slide_background(&pres, 1).expect("inherited background"), None);
+    assert!(slide_background(&pres, 2).is_err(), "out-of-range slide index");
 }
 

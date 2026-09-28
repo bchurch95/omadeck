@@ -1,176 +1,146 @@
-# CURRENT TASK: Smart Magnetic Connectors (Milestone 9)
+# CURRENT TASK: Slide Background Engine (`p:bg`) (Milestone 10)
 
 ## Goal
-Implement extraction and rendering for OpenXML Connector shapes (`Shape::Connector`), preserving their start/end connection sites (`stCxn`, `endCxn`) and rendering them dynamically on the slide canvas.
+Support custom slide background fills (`<p:bg>`), extract them during slide inspection, render them on the slide canvas/filmstrip in frontend, and allow setting slide background with undo support.
 
-## Exact Types & Definitions (DO NOT search .cargo/registry!)
+## Exact Types & Architecture (DO NOT search .cargo/registry!)
 
-In `office_toolkit::powerpoint` (already imported in `inspect.rs`):
+1. `office_toolkit::powerpoint::Slide`:
 ```rust
-pub struct Connector {
-    pub id: u32,
-    pub name: String,
-    pub properties: ShapeProperties,
-    pub start_connection: Option<ShapeConnection>,
-    pub end_connection: Option<ShapeConnection>,
+pub struct Slide {
+    pub shapes: Vec<Shape>,
+    pub notes: Option<TextBody>,
+    pub background: Option<Fill>, // Fill::Solid(Color), Fill::None, etc.
+    // ...
 }
+```
+`Slide::with_background(mut self, background: Fill) -> Self` already exists in `powerpoint-ooxml`!
 
-pub struct ShapeConnection {
-    pub shape_id: u32,
-    pub index: u32,
+2. `office_toolkit::drawing::Fill` & `Color`:
+```rust
+pub enum Fill {
+    None,
+    Solid(Color),
+    Gradient(GradientFill),
+    Pattern(PatternFill),
+    Image(ImageFill),
 }
 ```
 
-## Step 1: Update `crates/omashow-core/src/inspect.rs`
-
-1. Add `ConnectionInfo` and `ConnectorInfo` structs near `TableInfo`:
+## Step 1: Backend `crates/omashow-core/src/inspect.rs`
+1. Add `slide_background(pres: &Presentation, slide: usize) -> Result<Option<String>, Error>`:
 ```rust
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ConnectionInfo {
-    pub shape_id: u32,
-    pub index: u32,
+pub fn slide_background(pres: &Presentation, slide: usize) -> Result<Option<String>, Error> {
+    let s = pres.slides.get(slide).ok_or(Error::OutOfRange(slide))?;
+    Ok(s.background.as_ref().map(fill_to_css))
 }
+```
+(Notice `fill_to_css` is already defined in `inspect.rs`!)
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ConnectorInfo {
-    pub start_connection: Option<ConnectionInfo>,
-    pub end_connection: Option<ConnectionInfo>,
+2. In `crates/omashow-core/src/lib.rs`:
+Export `slide_background`:
+```rust
+pub use inspect::{
+    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo, ShapeInfo,
+    SlideDimensions, TextRunInfo,
+};
+```
+Add mutation helper:
+```rust
+pub fn set_slide_background(pres: &mut Presentation, slide: usize, fill: Option<Fill>) -> Result<(), Error> {
+    let s = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
+    s.background = fill;
+    Ok(())
 }
 ```
 
-2. Add `connector` field to `ShapeInfo`:
+3. In `crates/omashow-core/src/document.rs`:
+Expose `slide_background(&self, slide: usize) -> Result<Option<String>, Error>`:
 ```rust
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub connector: Option<ConnectorInfo>,
+pub fn slide_background(&self, slide: usize) -> Result<Option<String>, Error> {
+    crate::inspect::slide_background(&self.pres, slide)
+}
 ```
-Add `connector: None` to all existing `ShapeInfo` constructors (AutoShape, Picture, Chart, Group, Table, Media).
-
-3. In the `Shape::Connector(c)` arm of `shape_info()`:
+Add undoable `set_slide_background`:
+In `crates/omashow-core/src/undo.rs`:
+Add `Background` variant to `UndoCommand`:
 ```rust
-    Shape::Connector(c) => ShapeInfo {
-        id: c.id,
-        name: c.name.clone(),
-        kind: "connector",
-        placeholder: None,
-        bounds: c
-            .properties
-            .transform
-            .as_ref()
-            .and_then(|t| match (t.offset, t.extent) {
-                (Some((x, y)), Some((w, h))) => Some(ctx.map_box(x, y, w, h)),
-                _ => None,
-            }),
-        text: None,
-        fill: c.properties.fill.as_ref().map(fill_to_css),
-        line: c.properties.line.as_ref().map(line_info),
-        runs: Vec::new(),
-        pic: None,
-        table: None,
-        connector: Some(ConnectorInfo {
-            start_connection: c.start_connection.map(|sc| ConnectionInfo {
-                shape_id: sc.shape_id,
-                index: sc.index,
-            }),
-            end_connection: c.end_connection.map(|ec| ConnectionInfo {
-                shape_id: ec.shape_id,
-                index: ec.index,
-            }),
-        }),
-        children: None,
+    Background {
+        slide: usize,
+        before: Option<Fill>,
+        after: Option<Fill>,
+        description: String,
     },
 ```
-
-## Step 2: Update `apps/omashow-tauri/src/frontend/slide_render.js`
-
-In `drawShapes(container, shapes, pxPerEmu, pxPerInch, mini)`, add handling for `sh.kind === "connector"`:
-```javascript
-    if (sh.kind === "connector") {
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.className = "slide-connector";
-      svg.dataset.shapeId = sh.id;
-      svg.style.position = "absolute";
-      svg.style.left = "0";
-      svg.style.top = "0";
-      svg.style.width = "100%";
-      svg.style.height = "100%";
-      svg.style.pointerEvents = "none";
-      svg.style.overflow = "visible";
-
-      // If connected to shapes, resolve anchor points; otherwise use bounds
-      let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-      if (sh.bounds) {
-        x1 = sh.bounds.x * pxPerEmu;
-        y1 = sh.bounds.y * pxPerEmu;
-        x2 = (sh.bounds.x + sh.bounds.w) * pxPerEmu;
-        y2 = (sh.bounds.y + sh.bounds.h) * pxPerEmu;
-      }
-      if (sh.connector) {
-        if (sh.connector.start_connection) {
-          const src = shapes.find(s => s.id === sh.connector.start_connection.shape_id);
-          if (src && src.bounds) {
-            x1 = (src.bounds.x + src.bounds.w / 2) * pxPerEmu;
-            y1 = (src.bounds.y + src.bounds.h / 2) * pxPerEmu;
-          }
-        }
-        if (sh.connector.end_connection) {
-          const dst = shapes.find(s => s.id === sh.connector.end_connection.shape_id);
-          if (dst && dst.bounds) {
-            x2 = (dst.bounds.x + dst.bounds.w / 2) * pxPerEmu;
-            y2 = (dst.bounds.y + dst.bounds.h / 2) * pxPerEmu;
-          }
-        }
-      }
-
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", x1);
-      line.setAttribute("y1", y1);
-      line.setAttribute("x2", x2);
-      line.setAttribute("y2", y2);
-      const strokeColor = themeColor(sh.line && sh.line.color) || "#94a3b8";
-      const strokeWidth = sh.line && sh.line.width_emu ? Math.max(1, (sh.line.width_emu / 914400) * pxPerInch) : 2;
-      line.setAttribute("stroke", strokeColor);
-      line.setAttribute("stroke-width", strokeWidth);
-      svg.appendChild(line);
-      container.appendChild(svg);
-      continue;
-    }
-```
-
-## Step 3: Add Unit Test in `crates/omashow-core/tests/inspect.rs`
-
+(Remember to update `apply` and `revert` match arms for `Background` in `undo.rs`!)
+In `document.rs`:
 ```rust
-#[test]
-fn connector_extraction_with_connections() {
-    use office_toolkit::powerpoint::{Connector, ShapeConnection};
-    use office_toolkit::drawing::{ShapeProperties, Transform2D};
-
-    let mut props = ShapeProperties::new();
-    let mut transform = Transform2D::new();
-    transform.offset = Some((100_000, 100_000));
-    transform.extent = Some((500_000, 500_000));
-    props.transform = Some(transform);
-
-    let conn = Connector::new(101, "Arrow Connector")
-        .with_properties(props)
-        .with_start_connection(1, 0)
-        .with_end_connection(2, 2);
-
-    let mut pres = Presentation::new();
-    let slide = Slide::new().with_shape(Shape::Connector(conn));
-    pres.slides.push(slide);
-
-    let shapes = get_slide_shapes(&pres, 0).expect("shapes");
-    assert_eq!(shapes.len(), 1);
-    let s = &shapes[0];
-    assert_eq!(s.kind, "connector");
-    let cinfo = s.connector.as_ref().expect("connector info");
-    assert_eq!(cinfo.start_connection, Some(omashow_core::inspect::ConnectionInfo { shape_id: 1, index: 0 }));
-    assert_eq!(cinfo.end_connection, Some(omashow_core::inspect::ConnectionInfo { shape_id: 2, index: 2 }));
+pub fn set_slide_background(&mut self, slide: usize, fill: Option<Fill>) -> Result<(), Error> {
+    let before = self.pres.slides.get(slide).map(|s| s.background.clone()).ok_or(Error::OutOfRange(slide))?;
+    crate::set_slide_background(&mut self.pres, slide, fill.clone())?;
+    self.history.record(UndoCommand::Background {
+        slide,
+        before,
+        after: fill,
+        description: "change slide background".into(),
+    });
+    self.dirty = true;
+    Ok(())
 }
 ```
 
-## Step 4: Verification & Commit
-- Run `cargo test -p omashow-core`
-- Run `cargo check --workspace`
-- Mark `[x] Smart Magnetic Connectors` in TODO.md
-- Make git commit: `feat(connector): add smart magnetic connector extraction and SVG canvas rendering`
+## Step 2: Update SlideContent & Frontend
+1. In `apps/omashow-tauri/src-tauri/src/main.rs`:
+Update `SlideContent`:
+```rust
+#[derive(Serialize)]
+struct SlideContent {
+    index: usize,
+    slide_dimensions: SlideDimensions,
+    background: Option<String>,
+    shapes: Vec<omashow_core::ShapeInfo>,
+}
+```
+In `get_slide_content`:
+```rust
+    let bg = doc.slide_background(slide).map_err(|e| e.to_string())?;
+    Ok(SlideContent {
+        index: slide,
+        slide_dimensions: doc.slide_dimensions(),
+        background: bg,
+        shapes,
+    })
+```
+2. In `apps/omashow-tauri/src/frontend/slide_render.js`:
+In `renderSlideInto(container, content, mini = false)`:
+Apply slide background:
+```javascript
+  if (content.background && !NON_SOLID_FILLS.has(content.background)) {
+    const bg = themeColor(content.background);
+    container.style.backgroundColor = bg;
+  } else {
+    container.style.backgroundColor = "";
+  }
+```
+
+## Step 3: Tests & Verification
+In `crates/omashow-core/tests/inspect.rs`:
+Add test `slide_background_extraction_and_roundtrip`:
+```rust
+#[test]
+fn slide_background_extraction() {
+    use office_toolkit::drawing::{Color, Fill};
+    let mut pres = Presentation::new();
+    let slide = Slide::new().with_background(Fill::Solid(Color::Rgb("336699".to_string())));
+    pres.slides.push(slide);
+
+    let bg = omashow_core::slide_background(&pres, 0).expect("background extraction");
+    assert_eq!(bg, Some("#336699".to_string()));
+}
+```
+Run `cargo test -p omashow-core` to verify all tests pass!
+
+## Step 4: Complete & Move Forward
+- Mark `[x] Slide Background Engine (`p:bg`)` in TODO.md.
+- Commit: `feat(background): add slide background extraction, canvas rendering, and undoable mutation`
+- Then immediately continue to the next task in TODO.md (`Z-Order Controls & Stacking`).

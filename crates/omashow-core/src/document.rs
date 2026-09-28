@@ -17,6 +17,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
 
+use office_toolkit::drawing::Fill;
 use office_toolkit::powerpoint::Presentation;
 use office_toolkit::SaveToFile;
 use opc_ooxml::{Package, Relationship};
@@ -120,6 +121,11 @@ impl PptxDocument {
         crate::inspect::slide_dimensions(&self.pres)
     }
 
+    /// Explicit per-slide background fill as CSS, if set (`None` = inherit).
+    pub fn slide_background(&self, slide: usize) -> Result<Option<String>, Error> {
+        crate::inspect::slide_background(&self.pres, slide)
+    }
+
     /// Serializable shape view for slide `slide` — kinds, placeholder roles,
     /// bounds in slide coordinates, and text runs (group children included
     /// with remapped bounds).
@@ -162,6 +168,29 @@ impl PptxDocument {
             before,
             after: self.pres.slides[slide].notes.clone(),
             description: "change notes".into(),
+        });
+        self.dirty = true;
+        Ok(())
+    }
+
+    /// Set (or clear, with None) a slide's explicit background fill (undoable).
+    pub fn set_slide_background(
+        &mut self,
+        slide: usize,
+        fill: Option<Fill>,
+    ) -> Result<(), Error> {
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.background.clone())
+            .ok_or(Error::OutOfRange(slide))?;
+        crate::set_slide_background(&mut self.pres, slide, fill)?;
+        self.history.record(UndoCommand::Background {
+            slide,
+            before,
+            after: self.pres.slides[slide].background.clone(),
+            description: "change background".into(),
         });
         self.dirty = true;
         Ok(())

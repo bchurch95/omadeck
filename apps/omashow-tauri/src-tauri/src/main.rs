@@ -105,6 +105,7 @@ struct SlideContent {
     index: usize,
     slide_dimensions: SlideDimensions,
     shapes: Vec<omashow_core::ShapeInfo>,
+    background: Option<String>,
 }
 
 fn summary(doc: &PptxDocument) -> PresentationSummary {
@@ -159,9 +160,11 @@ fn get_slide_content(slide: usize, state: State<'_, Mutex<Deck>>) -> Result<Slid
     let deck = state.lock().map_err(|e| e.to_string())?;
     let doc = deck.doc.as_ref().ok_or("no presentation open")?;
     let shapes = doc.get_slide_shapes(slide).map_err(|e| e.to_string())?;
+    let bg = doc.slide_background(slide).map_err(|e| e.to_string())?;
     Ok(SlideContent {
         index: slide,
         slide_dimensions: doc.slide_dimensions(),
+        background: bg,
         shapes,
     })
 }

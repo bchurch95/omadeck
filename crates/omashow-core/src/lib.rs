@@ -17,7 +17,7 @@ pub mod undo;
 pub use document::PptxDocument;
 pub use error::Error;
 pub use inspect::{
-    get_slide_shapes, slide_count, slide_dimensions, BoundingBox, LineInfo, ShapeInfo,
+    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo, ShapeInfo,
     SlideDimensions, TextRunInfo,
 };
 pub use layout_geom::{LayoutGeometry, PhGeom, PhMap};
@@ -100,6 +100,16 @@ pub fn set_slide_notes(pres: &mut Presentation, slide: usize, notes: Option<Stri
         Some(n) if !n.trim().is_empty() => Some(text_body_from_string(&n)),
         _ => None,
     };
+    Ok(())
+}
+
+/// Set (or clear, with None) a slide's explicit background fill in place.
+pub fn set_slide_background(pres: &mut Presentation, slide: usize, fill: Option<office_toolkit::drawing::Fill>) -> Result<(), Error> {
+    let slide = pres
+        .slides
+        .get_mut(slide)
+        .ok_or(Error::OutOfRange(slide))?;
+    slide.background = fill;
     Ok(())
 }
 

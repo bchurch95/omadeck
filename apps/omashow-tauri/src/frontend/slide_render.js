@@ -16,6 +16,12 @@ function themeColor(c) {
 
 function renderSlideInto(container, content, mini = false) {
   container.querySelectorAll(".slide-shape,.slide-pic").forEach((el) => el.remove());
+  if (content.background && !NON_SOLID_FILLS.has(content.background)) {
+    const bg = themeColor(content.background);
+    container.style.backgroundColor = bg;
+  } else {
+    container.style.backgroundColor = "";
+  }
   const dims = content.slide_dimensions;
   const w = container.clientWidth || (mini ? 244 : 960);
   const pxPerEmu = w / dims.width_emu;
