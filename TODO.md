@@ -71,8 +71,8 @@
 
 ## Milestone 9: Rich Media, Audio/Video & Tables
 - [ ] Embedded Audio & Video Playback: Play slide media parts (`ppt/media/*.mp4`, `.wav`) with auto-play on slide entry, looping, and pause controls.
-- [ ] Table Support (`a:tbl`): Extract, render, and format OpenXML tables with column widths, borders, cell margins, and background fills.
-- [ ] Smart Magnetic Connectors: Lines and arrows that dynamically anchor between shape boundary points and adjust when shapes move.
+- [x] Table Support (`a:tbl`): Extract, render, and format OpenXML tables with column widths, borders, cell margins, and background fills.
+- [x] Smart Magnetic Connectors: Lines and arrows that dynamically anchor between shape boundary points and adjust when shapes move.
 
 ## Milestone 10: Canvas Backgrounds & Layer Management
 - [ ] Slide Background Engine (`p:bg`): Support custom slide background fills (solid hex colors, linear/radial gradients, and background picture fills `p:bgRef` / `blipFill`) with live canvas preview and an "Apply to All Slides" button.

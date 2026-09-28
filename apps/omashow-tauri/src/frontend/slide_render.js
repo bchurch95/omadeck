@@ -126,6 +126,56 @@ function drawShapes(container, shapes, pxPerEmu, pxPerInch, mini) {
       container.appendChild(tblWrap);
       continue;
     }
+    if (sh.kind === "connector") {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.className = "slide-connector";
+      svg.dataset.shapeId = sh.id;
+      svg.style.position = "absolute";
+      svg.style.left = "0";
+      svg.style.top = "0";
+      svg.style.width = "100%";
+      svg.style.height = "100%";
+      svg.style.pointerEvents = "none";
+      svg.style.overflow = "visible";
+
+      // If connected to shapes, resolve anchor points; otherwise use bounds
+      let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+      if (sh.bounds) {
+        x1 = sh.bounds.x_emu * pxPerEmu;
+        y1 = sh.bounds.y_emu * pxPerEmu;
+        x2 = (sh.bounds.x_emu + sh.bounds.width_emu) * pxPerEmu;
+        y2 = (sh.bounds.y_emu + sh.bounds.height_emu) * pxPerEmu;
+      }
+      if (sh.connector) {
+        if (sh.connector.start_connection) {
+          const src = shapes.find(s => s.id === sh.connector.start_connection.shape_id);
+          if (src && src.bounds) {
+            x1 = (src.bounds.x_emu + src.bounds.width_emu / 2) * pxPerEmu;
+            y1 = (src.bounds.y_emu + src.bounds.height_emu / 2) * pxPerEmu;
+          }
+        }
+        if (sh.connector.end_connection) {
+          const dst = shapes.find(s => s.id === sh.connector.end_connection.shape_id);
+          if (dst && dst.bounds) {
+            x2 = (dst.bounds.x_emu + dst.bounds.width_emu / 2) * pxPerEmu;
+            y2 = (dst.bounds.y_emu + dst.bounds.height_emu / 2) * pxPerEmu;
+          }
+        }
+      }
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      const strokeColor = themeColor(sh.line && sh.line.color) || "#94a3b8";
+      const strokeWidth = sh.line && sh.line.width_emu ? Math.max(1, (sh.line.width_emu / 914400) * pxPerInch) : 2;
+      line.setAttribute("stroke", strokeColor);
+      line.setAttribute("stroke-width", strokeWidth);
+      svg.appendChild(line);
+      container.appendChild(svg);
+      continue;
+    }
     if (sh.kind !== "autoshape" || !sh.bounds) continue;
     const el = document.createElement("div");
     el.className = "slide-shape";

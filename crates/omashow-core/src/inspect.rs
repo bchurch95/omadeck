@@ -146,6 +146,20 @@ pub struct TableInfo {
     pub band_cols: bool,
 }
 
+/// A connector's end anchor: the connected shape and its connection-site index.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConnectionInfo {
+    pub shape_id: u32,
+    pub index: u32,
+}
+
+/// Connection-site info for a connector shape (`stCxn` / `endCxn`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConnectorInfo {
+    pub start_connection: Option<ConnectionInfo>,
+    pub end_connection: Option<ConnectionInfo>,
+}
+
 /// Serializable view of one shape. For a group, `children` holds the nested
 /// shapes with their bounds already remapped out of the group's child
 /// coordinate space into slide coordinates.
@@ -180,6 +194,9 @@ pub struct ShapeInfo {
     /// Extracted table content and grid structure, only for a `table` shape.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table: Option<TableInfo>,
+    /// Connection-site info, only for a `connector` shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connector: Option<ConnectorInfo>,
     /// Nested shapes, only for a group.
     pub children: Option<Vec<ShapeInfo>>,
 }
@@ -351,6 +368,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                     .unwrap_or_default(),
                 pic: None,
                 table: None,
+                connector: None,
                 children: None,
             }
         }
@@ -379,6 +397,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             runs: Vec::new(),
             pic: Some(pic_info(p)),
             table: None,
+            connector: None,
             children: None,
         },
         Shape::Chart(c) => ShapeInfo {
@@ -398,6 +417,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             runs: Vec::new(),
             pic: None,
             table: None,
+            connector: None,
             children: None,
         },
         Shape::Group(g) => {
@@ -425,6 +445,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                 runs: Vec::new(),
                 pic: None,
                 table: None,
+                connector: None,
                 children: Some(children),
             }
         }
@@ -447,6 +468,16 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             runs: Vec::new(),
             pic: None,
             table: None,
+            connector: Some(ConnectorInfo {
+                start_connection: c.start_connection.map(|sc| ConnectionInfo {
+                    shape_id: sc.shape_id,
+                    index: sc.index,
+                }),
+                end_connection: c.end_connection.map(|ec| ConnectionInfo {
+                    shape_id: ec.shape_id,
+                    index: ec.index,
+                }),
+            }),
             children: None,
         },
         Shape::Table(t) => ShapeInfo {
@@ -466,6 +497,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             runs: Vec::new(),
             pic: None,
             table: Some(table_info(t)),
+            connector: None,
             children: None,
         },
         Shape::Media(m) => ShapeInfo {
@@ -485,6 +517,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             runs: Vec::new(),
             pic: None,
             table: None,
+            connector: None,
             children: None,
         },
     }

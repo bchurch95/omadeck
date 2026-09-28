@@ -12,8 +12,8 @@ use office_toolkit::drawing::{
     TextRun, TextRunProperties, Transform2D,
 };
 use office_toolkit::powerpoint::{
-    AutoShape, Picture, PictureFormat, Placeholder, PlaceholderKind, Presentation, Shape,
-    ShapeGroup, Slide,
+    AutoShape, Connector, Picture, PictureFormat, Placeholder, PlaceholderKind, Presentation,
+    Shape, ShapeGroup, Slide,
 };
 
 fn title_body() -> TextBody {
@@ -467,5 +467,81 @@ fn table_extraction_and_grid_info() {
     assert_eq!(table_info.rows[1][1].text.as_deref(), Some("Data 2"));
     assert!(table_info.first_row);
     assert!(table_info.band_rows);
+}
+
+#[test]
+fn connector_extraction_with_connections() {
+    // Two boxes the connector will link, plus the connector itself.
+    let box_a = AutoShape::new(1, "Box A").with_properties(
+        ShapeProperties::new().with_transform(Transform2D::new().with_offset(1_000_000, 1_000_000).with_extent(2_000_000, 1_000_000)),
+    );
+    let box_b = AutoShape::new(2, "Box B").with_properties(
+        ShapeProperties::new().with_transform(Transform2D::new().with_offset(5_000_000, 1_000_000).with_extent(2_000_000, 1_000_000)),
+    );
+    // A straight connector whose start is attached to Box A's site 0 and whose
+    // end is attached to Box B's site 2, with a 28,000 EMU (2.5 pt) outline.
+    let connector = Connector::new(3, "Connector 3")
+        .with_properties(
+            ShapeProperties::new()
+                .with_transform(
+                    Transform2D::new().with_offset(3_000_000, 1_500_000).with_extent(2_000_000, 0),
+                )
+                .with_line(Line::new().with_width_emu(28_000).with_fill(Fill::Solid(Color::Rgb("787878".to_string())))),
+        )
+        .with_start_connection(1, 0)
+        .with_end_connection(2, 2);
+
+    let mut pres = Presentation::new();
+    let slide = Slide::new().with_shape(Shape::AutoShape(box_a)).with_shape(Shape::AutoShape(box_b)).with_shape(Shape::Connector(connector));
+    pres.slides.push(slide);
+
+    let shapes = get_slide_shapes(&pres, 0).expect("slide shapes");
+    assert_eq!(shapes.len(), 3);
+
+    // The two boxes carry no connector info.
+    assert!(shapes[0].connector.is_none());
+    assert!(shapes[1].connector.is_none());
+
+    // The connector exposes its bounds, outline, and both connection sites.
+    let cx = &shapes[2];
+    assert_eq!(cx.kind, "connector");
+    assert_eq!(cx.name, "Connector 3");
+    let bounds = cx.bounds.as_ref().expect("connector bounds");
+    assert_eq!(bounds.x_emu, 3_000_000);
+    assert_eq!(bounds.y_emu, 1_500_000);
+    assert_eq!(bounds.width_emu, 2_000_000);
+    let line = cx.line.as_ref().expect("connector outline");
+    assert_eq!(line.width_emu, Some(28_000));
+    let info = cx.connector.as_ref().expect("connector info");
+    let start = info.start_connection.as_ref().expect("start connection");
+    assert_eq!(start.shape_id, 1);
+    assert_eq!(start.index, 0);
+    let end = info.end_connection.as_ref().expect("end connection");
+    assert_eq!(end.shape_id, 2);
+    assert_eq!(end.index, 2);
+}
+
+#[test]
+fn connector_without_connections_is_floating() {
+    // A connector with no start/end attachment: `connector` is still present
+    // (it is a connector), but both ends are `None`.
+    let connector = Connector::new(7, "Floating")
+        .with_properties(
+            ShapeProperties::new().with_transform(
+                Transform2D::new().with_offset(1_000_000, 2_000_000).with_extent(4_000_000, 300_000),
+            ),
+        );
+
+    let mut pres = Presentation::new();
+    let slide = Slide::new().with_shape(Shape::Connector(connector));
+    pres.slides.push(slide);
+
+    let shapes = get_slide_shapes(&pres, 0).expect("slide shapes");
+    assert_eq!(shapes.len(), 1);
+    let cx = &shapes[0];
+    assert_eq!(cx.kind, "connector");
+    let info = cx.connector.as_ref().expect("connector info present even when floating");
+    assert!(info.start_connection.is_none());
+    assert!(info.end_connection.is_none());
 }
 
