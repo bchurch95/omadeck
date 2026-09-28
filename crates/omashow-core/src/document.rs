@@ -309,6 +309,34 @@ impl PptxDocument {
         Ok(())
     }
 
+    /// Reorder a shape's z-order (bring to front / send to back / bring
+    /// forward / send backward). Snapshot before and after for undo.
+    /// Reorders a shape's z-order on a slide, recording a single undo
+    /// command. Returns whether the order actually changed; boundary
+    /// no-ops record nothing.
+    pub fn reorder_shape_z_order(
+        &mut self,
+        slide: usize,
+        shape_id: u32,
+        action: crate::ZOrderAction,
+    ) -> Result<bool, Error> {
+        let before = self.pres.slides.get(slide).map(|s| s.shapes.clone())
+            .ok_or(Error::OutOfRange(slide))?;
+        let changed = crate::reorder_shape_z_order(&mut self.pres, slide, shape_id, action)?;
+        // Boundary no-ops leave the order untouched; skip the history record
+        // so undo/redo only ever sees real reorders.
+        if changed {
+            self.history.record(UndoCommand::Shapes {
+                slide,
+                before,
+                after: self.pres.slides[slide].shapes.clone(),
+                description: "reorder shape z-order".into(),
+            });
+            self.dirty = true;
+        }
+        Ok(changed)
+    }
+
     /// Records a slide-list change anchored at `from`: the captured tail is
     /// `slides[from..]` before the change, and the current tail is `after`.
     fn record_slice_change(&mut self, from: usize, before_tail: Vec<Slide>, description: &str) {

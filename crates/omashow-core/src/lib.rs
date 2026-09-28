@@ -168,6 +168,74 @@ pub fn move_slide(pres: &mut Presentation, from: usize, to: usize) -> Result<(),
     Ok(())
 }
 
+/// Z-order (painting order) operations on a slide's shape tree.
+/// Index 0 of `Slide::shapes` is backmost; the last entry is frontmost.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZOrderAction {
+    BringToFront,
+    SendToBack,
+    BringForward,
+    SendBackward,
+}
+
+/// Reorder one shape within a slide's z-order (document order of `p:spTree`).
+/// Returns whether the order actually changed — boundary cases (frontmost
+/// shape + `BringForward`, backmost + `SendBackward`, single-shape slides)
+/// are no-ops and report `Ok(false)`.
+pub fn reorder_shape_z_order(
+    pres: &mut Presentation,
+    slide: usize,
+    shape_id: u32,
+    action: ZOrderAction,
+) -> Result<bool, Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
+    let idx = slide.shapes.iter().position(|s| match s {
+        Shape::AutoShape(a) => a.id == shape_id,
+        Shape::Picture(p) => p.id == shape_id,
+        Shape::Chart(c) => c.id == shape_id,
+        Shape::Group(g) => g.id == shape_id,
+        Shape::Connector(c) => c.id == shape_id,
+        Shape::Table(t) => t.id == shape_id,
+        Shape::Media(m) => m.id == shape_id,
+    })
+    .ok_or(Error::ShapeNotFound(shape_id))?;
+
+    let n = slide.shapes.len();
+    if n <= 1 {
+        return Ok(false);
+    }
+
+    let changed = match action {
+        ZOrderAction::BringToFront => {
+            let shape = slide.shapes.remove(idx);
+            slide.shapes.push(shape);
+            idx != n - 1
+        }
+        ZOrderAction::SendToBack => {
+            let shape = slide.shapes.remove(idx);
+            slide.shapes.insert(0, shape);
+            idx != 0
+        }
+        ZOrderAction::BringForward => {
+            if idx + 1 < n {
+                slide.shapes.swap(idx, idx + 1);
+                true
+            } else {
+                false
+            }
+        }
+        ZOrderAction::SendBackward => {
+            if idx > 0 {
+                slide.shapes.swap(idx, idx - 1);
+                true
+            } else {
+                false
+            }
+        }
+    };
+    Ok(changed)
+}
+
 /// Replace the text of the shape identified by `shape_id` on `slide`.
 /// Searches top-level shapes and one level into groups. The replacement text
 /// is laid out as one paragraph per line and inherits the shape's original

@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use tauri::{Manager, State, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
-use omashow_core::{model_of, PptxDocument, SlideDimensions};
+use omashow_core::{model_of, PptxDocument, SlideDimensions, ZOrderAction};
 use serde::Serialize;
 
 /// The in-memory deck — the single source of truth. `PptxDocument` holds both the
@@ -53,6 +53,7 @@ fn main() {
             open_file_dialog,
             save_file_dialog,
             list_monitors,
+            reorder_shape_z_order,
             set_current_slide,
             get_current_slide,
             open_audience_window,
@@ -241,6 +242,27 @@ fn delete_slide(slide: usize, state: State<'_, Mutex<Deck>>) -> Result<String, S
     let mut deck = state.lock().map_err(|e| e.to_string())?;
     let doc = deck.doc.as_mut().ok_or("no presentation open")?;
     doc.delete_slide(slide).map_err(|e| e.to_string())?;
+    project(doc)
+}
+
+#[tauri::command]
+fn reorder_shape_z_order(
+    slide: usize,
+    shape_id: u32,
+    action: String,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<String, String> {
+    let action = match action.as_str() {
+        "bring_to_front" => ZOrderAction::BringToFront,
+        "send_to_back" => ZOrderAction::SendToBack,
+        "bring_forward" => ZOrderAction::BringForward,
+        "send_backward" => ZOrderAction::SendBackward,
+        other => return Err(format!("unknown z-order action: {other}")),
+    };
+    let mut deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_mut().ok_or("no presentation open")?;
+    doc.reorder_shape_z_order(slide, shape_id, action)
+        .map_err(|e| e.to_string())?;
     project(doc)
 }
 
