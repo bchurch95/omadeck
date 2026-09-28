@@ -36,6 +36,7 @@ function drawShapes(container, shapes, pxPerEmu, pxPerInch, mini) {
       if (!sh.bounds) continue;
       const pic = document.createElement("div");
       pic.className = "slide-pic";
+      pic.dataset.shapeId = sh.id;
       place(pic, sh.bounds, pxPerEmu);
       if (sh.pic && sh.pic.data_uri) {
         const img = document.createElement("img");

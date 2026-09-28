@@ -621,6 +621,8 @@ function fetchSlideContent(i, force = false) {
 
 function refreshThumbs() {
   slideContents.clear();
+  hiddenShapes.clear();
+  selectedShape.clear();
   if (!model) return;
   model.slides.forEach((_, i) => fetchSlideContent(i));
 }
@@ -637,6 +639,8 @@ function paintSlide(i, content) {
   if (i === currentSlide) {
     fitCanvas();
     renderSlideInto($("slide-stage"), content, false);
+    applyHiddenShapes(i);
+    renderLayersPanel();
   }
   if (i === currentSlide + 1) renderSlideInto($("next-thumb"), content, true);
   updateInspector();
@@ -1463,6 +1467,134 @@ notesInput.addEventListener("input", () => {
   markState("edited");
   updateNotesCount();
   commitNotes();
+});
+
+// ---------- layers panel: selection, visibility, z-order ----------
+const layersPanel = $("layers-panel");
+const layersList = $("layers-list");
+const layersCount = $("layers-count");
+const layersCollapse = $("layers-collapse");
+
+// Session-local display state per slide — intentionally not persisted to the PPTX.
+const hiddenShapes = new Map();  // slide index -> Set<shapeId>
+const selectedShape = new Map(); // slide index -> shapeId
+
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+const EYE_CLOSED = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/><line x1="4" y1="20" x2="20" y2="4"/></svg>';
+
+function layerName(shape) {
+  const t = (shape.text || "").replace(/\s+/g, " ").trim();
+  if (t) return t.length > 30 ? t.slice(0, 29) + "…" : t;
+  return shape.name || "Shape";
+}
+
+function applyHiddenShapes(slide) {
+  const hidden = hiddenShapes.get(slide);
+  const sel = "#slide-stage .slide-shape[data-shape-id],#slide-stage .slide-pic[data-shape-id],#slide-stage .slide-connector[data-shape-id]";
+  document.querySelectorAll(sel).forEach((el) => {
+    const id = Number(el.dataset.shapeId);
+    el.style.display = (hidden && hidden.has(id)) ? "none" : "";
+  });
+}
+
+function renderLayersPanel() {
+  const shapes = model && currentSlide >= 0 ? (slideContents.get(currentSlide)?.shapes || []) : [];
+  layersCount.textContent = shapes.length ? String(shapes.length) : "";
+  if (!shapes.length) {
+    layersList.innerHTML = '<div id="layers-empty">No shapes on this slide</div>';
+    return;
+  }
+  const sel = selectedShape.get(currentSlide);
+  const hidden = hiddenShapes.get(currentSlide) || new Set();
+  const n = shapes.length;
+  // Front of the z-stack first: document order is back-to-front, so reverse it.
+  layersList.replaceChildren(...shapes.map((shape, rev) => {
+    const docIdx = n - 1 - rev;
+    const isHidden = hidden.has(shape.id);
+    const row = document.createElement("div");
+    row.className = "layer-item"
+      + (shape.id === sel ? " active" : "")
+      + (isHidden ? " hidden-layer" : "");
+    row.dataset.shapeId = String(shape.id);
+    row.title = `Layer ${docIdx + 1} of ${n} · ${shape.kind}`;
+
+    const eye = document.createElement("button");
+    eye.className = "layer-eye";
+    eye.title = isHidden ? "Show shape" : "Hide shape (display only, not saved)";
+    eye.innerHTML = isHidden ? EYE_CLOSED : EYE_OPEN;
+    eye.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const set = hiddenShapes.get(currentSlide) || new Set();
+      if (set.has(shape.id)) set.delete(shape.id); else set.add(shape.id);
+      hiddenShapes.set(currentSlide, set);
+      applyHiddenShapes(currentSlide);
+      renderLayersPanel();
+    });
+
+    const name = document.createElement("span");
+    name.className = "layer-name";
+    name.textContent = layerName(shape);
+
+    const type = document.createElement("span");
+    type.className = "layer-type";
+    type.textContent = (shape.kind || "shape").toUpperCase();
+
+    const acts = document.createElement("span");
+    acts.className = "layer-actions";
+    const up = document.createElement("button");
+    up.className = "layer-up";
+    up.title = "Bring forward (closer to viewer)";
+    up.disabled = docIdx === n - 1;
+    up.addEventListener("click", (e) => { e.stopPropagation(); reorderLayer(shape.id, "bring_forward"); });
+    const down = document.createElement("button");
+    down.className = "layer-down";
+    down.title = "Send backward (further from viewer)";
+    down.disabled = docIdx === 0;
+    down.addEventListener("click", (e) => { e.stopPropagation(); reorderLayer(shape.id, "send_backward"); });
+    acts.append(up, down);
+
+    row.append(eye, name, type, acts);
+    row.addEventListener("click", () => {
+      selectedShape.set(currentSlide, shape.id);
+      renderLayersPanel();
+    });
+    return row;
+  }));
+  // Re-apply the highlight to the freshly painted stage.
+  if (sel != null) {
+    const el = document.querySelector(`#slide-stage .slide-shape[data-shape-id="${sel}"],#slide-stage .slide-pic[data-shape-id="${sel}"],#slide-stage .slide-connector[data-shape-id="${sel}"]`);
+    if (el) el.classList.add("shape-selected");
+  }
+}
+
+function reorderLayer(shapeId, action) {
+  if (!model || currentSlide < 0) return;
+  const slide = currentSlide;
+  invoke("reorder_shape_z_order", { slide, shapeId, action })
+    .then((m) => {
+      model = JSON.parse(m);
+      fetchSlideContent(slide, true);
+      markState("edited");
+      refreshUndoUI();
+      flash(action === "bring_forward" ? "brought forward" : "sent backward");
+    })
+    .catch((e) => flash(String(e), "err"));
+}
+
+// Single click on a stage shape selects it in the panel (double click still edits text).
+$("slide-stage").addEventListener("click", (e) => {
+  if (document.body.dataset.mode !== "edit" || inkTool) return;
+  const el = e.target.closest(".slide-shape[data-shape-id],.slide-pic[data-shape-id]");
+  if (el) selectedShape.set(currentSlide, Number(el.dataset.shapeId));
+  else if (e.target.id === "slide-stage")
+    selectedShape.delete(currentSlide);
+  renderLayersPanel();
+});
+
+layersCollapse.addEventListener("click", () => {
+  const collapsed = layersPanel.classList.toggle("collapsed");
+  layersCollapse.innerHTML = collapsed ? "&#9656;" : "&#9662;";
+  layersCollapse.title = collapsed ? "Expand layers" : "Collapse layers";
 });
 
 // ---------- keyboard: arrows switch slides, Esc ends the show ----------

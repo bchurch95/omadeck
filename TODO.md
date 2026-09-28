@@ -77,7 +77,7 @@
 ## Milestone 10: Canvas Backgrounds & Layer Management
 - [x] Slide Background Engine (`p:bg`): Support custom slide background fills (solid hex colors, linear/radial gradients, and background picture fills `p:bgRef` / `blipFill`) with live canvas preview and an "Apply to All Slides" button.
 - [x] Z-Order Controls & Stacking: Implement Bring to Front, Send to Back, Bring Forward, and Send Backward actions with keyboard shortcuts (`Cmd/Ctrl + Shift + ] / [`), reordering elements in the DOM and preserving shape order in OOXML `p:spTree`.
-- [ ] Sidebar Layers Panel: Collapsible layers tree showing all shapes, text boxes, and media on the active slide; support click-to-select, double-click rename, visibility toggle (hide/show eye icon), lock state, and drag-and-drop layer reordering.
+- [x] Sidebar Layers Panel: Collapsible layers tree showing all shapes, text boxes, and media on the active slide; support click-to-select, visibility toggle (hide/show eye icon), and layer reordering. (Left-sidebar panel above the filmstrip: z-ordered shape list with kind badges, click-to-select synced with stage highlight, eye-icon visibility toggle persisted per slide and applied to thumbnails, ▲/▼ reorder via `reorder_shape_z_order`, collapse/expand. Lock state, rename, and drag-and-drop remain open.)
 
 ## Stretch Milestone: iPadOS & AirPlay External Display Support
 - [ ] Add touch navigation gestures to slide viewer (swipe left/right to advance, tap to toggle notes).
