@@ -53,7 +53,10 @@ fn slide_text_is_escaped_and_present() {
         html.contains("A &amp; B &lt;draft&gt;"),
         "title text must be HTML-escaped"
     );
-    assert!(!html.contains("A & B <draft>"), "raw markup leaked into output");
+    assert!(
+        !html.contains("A & B <draft>"),
+        "raw markup leaked into output"
+    );
 }
 
 #[test]
@@ -91,5 +94,11 @@ fn export_to_file_writes_html() {
 
 fn uuid_suffix() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    format!("{:x}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos())
+    format!(
+        "{:x}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    )
 }

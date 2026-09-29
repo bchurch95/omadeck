@@ -3,9 +3,9 @@
 //! Every assertion runs on a freshly opened real fixture, so these prove the
 //! command-pattern undo restores byte-relevant state, not just in-memory state.
 
-use omashow_core::{model_of, PptxDocument, ZOrderAction};
 use office_toolkit::drawing::{ShapeProperties, Transform2D};
 use office_toolkit::powerpoint::{AutoShape, Shape, Slide};
+use omashow_core::{model_of, PptxDocument, ZOrderAction};
 
 fn doc() -> PptxDocument {
     PptxDocument::open("/tmp/omashow-rt/real.pptx").expect("fixture opens")
@@ -17,7 +17,10 @@ fn title_edit_undo_redo_roundtrip() {
     assert!(d.slide_count() >= 2);
 
     d.set_title(0, "Changed Title").unwrap();
-    assert_eq!(model_of(&d.pres).slides[0].title.as_deref(), Some("Changed Title"));
+    assert_eq!(
+        model_of(&d.pres).slides[0].title.as_deref(),
+        Some("Changed Title")
+    );
     assert!(d.can_undo());
 
     let what = d.undo().expect("undo works");
@@ -26,7 +29,10 @@ fn title_edit_undo_redo_roundtrip() {
     assert_ne!(restored.as_deref(), Some("Changed Title"));
 
     d.redo().expect("redo works");
-    assert_eq!(model_of(&d.pres).slides[0].title.as_deref(), Some("Changed Title"));
+    assert_eq!(
+        model_of(&d.pres).slides[0].title.as_deref(),
+        Some("Changed Title")
+    );
 }
 
 #[test]
@@ -36,7 +42,10 @@ fn add_and_delete_slide_undo() {
 
     let idx = d.add_slide_at(before - 1, Some("Inserted".into())).unwrap();
     assert_eq!(d.slide_count(), before + 1);
-    assert_eq!(model_of(&d.pres).slides[idx].title.as_deref(), Some("Inserted"));
+    assert_eq!(
+        model_of(&d.pres).slides[idx].title.as_deref(),
+        Some("Inserted")
+    );
 
     d.undo().unwrap();
     assert_eq!(d.slide_count(), before);
@@ -54,10 +63,18 @@ fn add_and_delete_slide_undo() {
 fn move_slide_reorders_and_undoes() {
     let mut d = doc();
     assert!(d.slide_count() >= 3);
-    let before: Vec<Option<String>> = model_of(&d.pres).slides.iter().map(|s| s.title.clone()).collect();
+    let before: Vec<Option<String>> = model_of(&d.pres)
+        .slides
+        .iter()
+        .map(|s| s.title.clone())
+        .collect();
 
     d.move_slide(0, 2).unwrap();
-    let after: Vec<Option<String>> = model_of(&d.pres).slides.iter().map(|s| s.title.clone()).collect();
+    let after: Vec<Option<String>> = model_of(&d.pres)
+        .slides
+        .iter()
+        .map(|s| s.title.clone())
+        .collect();
     // [A,B,C] moved 0→2 is [B,C,A]: the moved slide lands at index 2, the
     // rest shift down.
     assert_eq!(after[0], before[1]);
@@ -66,7 +83,11 @@ fn move_slide_reorders_and_undoes() {
 
     let undone = d.undo().expect("undo works");
     assert_eq!(undone, "move slide");
-    let restored: Vec<Option<String>> = model_of(&d.pres).slides.iter().map(|s| s.title.clone()).collect();
+    let restored: Vec<Option<String>> = model_of(&d.pres)
+        .slides
+        .iter()
+        .map(|s| s.title.clone())
+        .collect();
     assert_eq!(restored, before);
 }
 
@@ -130,7 +151,11 @@ fn undo_restores_byte_equivalent_deck_after_save() {
     let reopened = PptxDocument::open(&out).unwrap();
     assert_eq!(
         model_of(&reopened.pres),
-        model_of(&PptxDocument::open("/tmp/omashow-rt/real.pptx").unwrap().pres)
+        model_of(
+            &PptxDocument::open("/tmp/omashow-rt/real.pptx")
+                .unwrap()
+                .pres
+        )
     );
 }
 
@@ -139,7 +164,9 @@ fn z_test_deck() -> PptxDocument {
         Shape::AutoShape(
             AutoShape::new(id, name).with_properties(
                 ShapeProperties::new().with_transform(
-                    Transform2D::new().with_offset(0, 0).with_extent(100_000, 100_000),
+                    Transform2D::new()
+                        .with_offset(0, 0)
+                        .with_extent(100_000, 100_000),
                 ),
             ),
         )

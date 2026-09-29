@@ -13,7 +13,9 @@ use printpdf::line::Polygon;
 use printpdf::path::{PaintMode, WindingOrder};
 use printpdf::point::Point;
 use printpdf::scale::Mm;
-use printpdf::{BuiltinFont, Color, PdfDocument, PdfDocumentReference, PdfLayerReference, Pt, Rgb, TextMatrix};
+use printpdf::{
+    BuiltinFont, Color, PdfDocument, PdfDocumentReference, PdfLayerReference, Pt, Rgb, TextMatrix,
+};
 
 use crate::document::PptxDocument;
 use crate::error::Error;
@@ -263,9 +265,7 @@ fn paint_text(
             // so every segment is positioned exactly on the page.
             let x_pt: Pt = Mm(x_mm).into();
             let y_pt: Pt = Mm(baseline_mm).into();
-            layer.set_text_matrix(TextMatrix::Raw([
-                1.0, 0.0, 0.0, 1.0, x_pt.0, y_pt.0,
-            ]));
+            layer.set_text_matrix(TextMatrix::Raw([1.0, 0.0, 0.0, 1.0, x_pt.0, y_pt.0]));
             layer.write_text(text, &font);
             x_mm += text.chars().map(|c| avg_advance(c, *seg_size)).sum::<f32>() * MM_PER_PT;
         }
@@ -374,11 +374,17 @@ fn parse_css_color(css: &str) -> Option<(f32, f32, f32)> {
             return None;
         };
         let bytes = hex_bytes(&expanded)?;
-        return Some((bytes[0] as f32 / 255.0, bytes[1] as f32 / 255.0, bytes[2] as f32 / 255.0));
+        return Some((
+            bytes[0] as f32 / 255.0,
+            bytes[1] as f32 / 255.0,
+            bytes[2] as f32 / 255.0,
+        ));
     }
     if let Some(rest) = css.strip_prefix("hsl(") {
         let rest = rest.strip_suffix(')').unwrap_or(rest);
-        let mut parts = rest.split(',').map(|p| p.trim().trim_end_matches('%').parse::<f32>().ok());
+        let mut parts = rest
+            .split(',')
+            .map(|p| p.trim().trim_end_matches('%').parse::<f32>().ok());
         let h = parts.next().flatten()?;
         let s = parts.next().flatten()?;
         let l = parts.next().flatten()?;
@@ -478,7 +484,12 @@ fn named_color(name: &str) -> Option<(f32, f32, f32)> {
 
 fn css_to_pdf_color(css: &str) -> Option<Color> {
     parse_css_color(css).map(|(r, g, b)| {
-        Color::Rgb(Rgb::new(r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0), None))
+        Color::Rgb(Rgb::new(
+            r.clamp(0.0, 1.0),
+            g.clamp(0.0, 1.0),
+            b.clamp(0.0, 1.0),
+            None,
+        ))
     })
 }
 
@@ -504,7 +515,11 @@ mod tests {
     fn parses_hex_colors() {
         assert_eq!(
             parse_css_color("#1A2B3C"),
-            Some((0x1a as f32 / 255.0, 0x2b as f32 / 255.0, 0x3c as f32 / 255.0))
+            Some((
+                0x1a as f32 / 255.0,
+                0x2b as f32 / 255.0,
+                0x3c as f32 / 255.0
+            ))
         );
         assert_eq!(parse_css_color("#fff"), Some((1.0, 1.0, 1.0)));
         assert_eq!(parse_css_color("#000000ff"), Some((0.0, 0.0, 0.0)));
@@ -524,7 +539,10 @@ mod tests {
 
     #[test]
     fn font_mapping_covers_styles() {
-        assert!(matches!(font_for(None, false, false), BuiltinFont::Helvetica));
+        assert!(matches!(
+            font_for(None, false, false),
+            BuiltinFont::Helvetica
+        ));
         assert!(matches!(
             font_for(Some("Calibri"), true, false),
             BuiltinFont::HelveticaBold

@@ -22,8 +22,8 @@ use std::io::Cursor;
 
 use office_toolkit::powerpoint::Presentation;
 use office_toolkit::OpenFile;
-use opc_ooxml::Package;
 use omashow_core::{model_of, PptxDocument};
+use opc_ooxml::Package;
 
 const SRC: &str = "/tmp/omashow-rt/real.pptx";
 const OUT_NOOP: &str = "/tmp/omashow-rt/real_noop.pptx";
@@ -58,7 +58,10 @@ fn main() {
     // 1) No-op save must be byte-identical.
     let doc = PptxDocument::open(SRC).unwrap();
     doc.save(OUT_NOOP).unwrap();
-    check(std::fs::read(SRC).unwrap() == std::fs::read(OUT_NOOP).unwrap(), "no-op save is byte-identical");
+    check(
+        std::fs::read(SRC).unwrap() == std::fs::read(OUT_NOOP).unwrap(),
+        "no-op save is byte-identical",
+    );
 
     // 2) Edited save must preserve every original part and apply the edit.
     let mut doc = PptxDocument::open(SRC).unwrap();
@@ -68,7 +71,11 @@ fn main() {
     let before = part_names(SRC);
     let after = part_names(OUT_EDIT);
     let lost: Vec<&String> = before.iter().filter(|n| !after.contains(n)).collect();
-    println!("real deck: {} parts before, {} after", before.len(), after.len());
+    println!(
+        "real deck: {} parts before, {} after",
+        before.len(),
+        after.len()
+    );
     if lost.is_empty() {
         println!("PASS all original parts preserved");
     } else {
@@ -83,8 +90,14 @@ fn main() {
     let src_model = model_of(&Presentation::open_file(SRC).unwrap());
     let pres = Presentation::open_file(OUT_EDIT).unwrap();
     let model = model_of(&pres);
-    check(model.slides[0].title.as_deref() == Some(NEW_TITLE), "title edit applied");
-    check(model.slides.len() == src_model.slides.len(), "slide count intact");
+    check(
+        model.slides[0].title.as_deref() == Some(NEW_TITLE),
+        "title edit applied",
+    );
+    check(
+        model.slides.len() == src_model.slides.len(),
+        "slide count intact",
+    );
 
     println!("verify_real: all checks passed");
 }

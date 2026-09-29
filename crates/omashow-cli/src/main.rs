@@ -12,15 +12,40 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    New { output: String },
-    Open { input: String },
-    Save { input: String, output: String },
-    List { input: String },
-    Export { input: String, output: String },
-    ExportPdf { input: String, output: String },
-    ExportHtml { input: String, output: String },
-    Edit { input: String, output: String, slide: usize, title: String },
-    Inspect { input: String },
+    New {
+        output: String,
+    },
+    Open {
+        input: String,
+    },
+    Save {
+        input: String,
+        output: String,
+    },
+    List {
+        input: String,
+    },
+    Export {
+        input: String,
+        output: String,
+    },
+    ExportPdf {
+        input: String,
+        output: String,
+    },
+    ExportHtml {
+        input: String,
+        output: String,
+    },
+    Edit {
+        input: String,
+        output: String,
+        slide: usize,
+        title: String,
+    },
+    Inspect {
+        input: String,
+    },
 }
 
 /// One slide of the `inspect` output: metadata plus the full shape view.
@@ -45,7 +70,10 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Commands::New { output } => {
-            let model = PresentationModel { title: "Untitled".into(), slides: vec![] };
+            let model = PresentationModel {
+                title: "Untitled".into(),
+                slides: vec![],
+            };
             save_pptx(&output, &model)?;
             println!("Created {}", output);
         }
@@ -80,7 +108,12 @@ fn main() -> anyhow::Result<()> {
             doc.export_html(&output)?;
             println!("Exported {} slides -> {}", doc.slide_count(), output);
         }
-        Commands::Edit { input, output, slide, title } => {
+        Commands::Edit {
+            input,
+            output,
+            slide,
+            title,
+        } => {
             let mut model = open_pptx(&input)?;
             if let Some(s) = model.slides.get_mut(slide) {
                 s.title = Some(title);

@@ -1,6 +1,10 @@
+use office_toolkit::drawing::{
+    ShapeProperties, TextBody, TextParagraph, TextRun, TextRunProperties, Transform2D,
+};
+use office_toolkit::powerpoint::{
+    AutoShape, Placeholder, PlaceholderKind, Presentation, Shape, Slide,
+};
 use serde::{Deserialize, Serialize};
-use office_toolkit::powerpoint::{Presentation, Slide, Shape, AutoShape, PlaceholderKind, Placeholder};
-use office_toolkit::drawing::{TextBody, TextParagraph, TextRun, TextRunProperties, ShapeProperties, Transform2D};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PresentationModel {
@@ -22,7 +26,11 @@ impl PresentationModel {
 
     /// Non-consuming view of a full deck — keeps every shape intact in the original.
     pub fn from_presentation_ref(pres: &Presentation) -> Self {
-        let title = pres.properties.title.clone().unwrap_or_else(|| "Untitled".to_string());
+        let title = pres
+            .properties
+            .title
+            .clone()
+            .unwrap_or_else(|| "Untitled".to_string());
         let slides = pres
             .slides
             .iter()
@@ -32,8 +40,16 @@ impl PresentationModel {
                 let notes_text = slide.notes.as_ref().map(text_body_to_string);
                 SlideModel {
                     index: i,
-                    title: if title_text.trim().is_empty() { None } else { Some(title_text) },
-                    notes: if notes_text.as_deref().unwrap_or("").trim().is_empty() { None } else { notes_text },
+                    title: if title_text.trim().is_empty() {
+                        None
+                    } else {
+                        Some(title_text)
+                    },
+                    notes: if notes_text.as_deref().unwrap_or("").trim().is_empty() {
+                        None
+                    } else {
+                        notes_text
+                    },
                 }
             })
             .collect();
@@ -93,7 +109,10 @@ fn extract_slide_title(slide: &Slide) -> String {
             // Prefer placeholder title shapes
             if let Some(ph) = &auto.placeholder {
                 use office_toolkit::powerpoint::PlaceholderKind;
-                if matches!(ph.kind, PlaceholderKind::Title | PlaceholderKind::CenterTitle) {
+                if matches!(
+                    ph.kind,
+                    PlaceholderKind::Title | PlaceholderKind::CenterTitle
+                ) {
                     if let Some(tb) = &auto.text_body {
                         return text_body_to_string(tb);
                     }

@@ -52,8 +52,11 @@ fn zip_without_content_types_is_rejected() {
     let mut cursor = Cursor::new(Vec::new());
     {
         let mut zip = zip::ZipWriter::new(&mut cursor);
-        zip.start_file("ppt/presentation.xml", zip::write::SimpleFileOptions::default())
-            .unwrap();
+        zip.start_file(
+            "ppt/presentation.xml",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
         zip.write_all(b"<x/>").unwrap();
         zip.finish().unwrap();
     }
@@ -66,8 +69,11 @@ fn invalid_content_types_xml_is_rejected() {
     let mut cursor = Cursor::new(Vec::new());
     {
         let mut zip = zip::ZipWriter::new(&mut cursor);
-        zip.start_file("[Content_Types].xml", zip::write::SimpleFileOptions::default())
-            .unwrap();
+        zip.start_file(
+            "[Content_Types].xml",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
         zip.write_all(b"<Types><Override this is not xml").unwrap();
         zip.finish().unwrap();
     }
@@ -89,7 +95,8 @@ fn corrupted_slide_xml_is_rejected() {
         for i in 0..zip.len() {
             let mut entry = zip.by_index(i).unwrap();
             let name = entry.name().to_string();
-            out.start_file(&name, zip::write::SimpleFileOptions::default()).unwrap();
+            out.start_file(&name, zip::write::SimpleFileOptions::default())
+                .unwrap();
             if name == "ppt/slides/slide1.xml" {
                 out.write_all(b"<p:sld xmlns:p='x' unclosed").unwrap();
             } else {

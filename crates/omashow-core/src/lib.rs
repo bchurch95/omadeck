@@ -1,24 +1,27 @@
-use office_toolkit::{OpenFile, SaveToFile};
+use office_toolkit::drawing::{
+    ShapeProperties, TextBody, TextParagraph, TextParagraphProperties, TextRun, TextRunProperties,
+    Transform2D,
+};
 use office_toolkit::powerpoint::{AutoShape, Placeholder, PlaceholderKind, Shape, Slide};
-use office_toolkit::drawing::{ShapeProperties, TextBody, TextParagraph, TextParagraphProperties, TextRun, TextRunProperties, Transform2D};
+use office_toolkit::{OpenFile, SaveToFile};
 
 use model::text_body_from_string;
 
+pub mod document;
 pub mod error;
 pub mod export_html;
 pub mod export_pdf;
-pub mod model;
-pub mod io;
-pub mod document;
 pub mod inspect;
+pub mod io;
 pub mod layout_geom;
+pub mod model;
 pub mod undo;
 
 pub use document::PptxDocument;
 pub use error::Error;
 pub use inspect::{
-    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo, ShapeInfo,
-    SlideDimensions, TextRunInfo,
+    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo,
+    ShapeInfo, SlideDimensions, TextRunInfo,
 };
 pub use layout_geom::{LayoutGeometry, PhGeom, PhMap};
 pub use model::{PresentationModel, SlideModel};
@@ -55,10 +58,7 @@ pub fn model_of(pres: &Presentation) -> PresentationModel {
 /// Set the title of a slide in place — edits the existing title placeholder if present,
 /// otherwise inserts a standard title text box. All other content is untouched.
 pub fn set_slide_title(pres: &mut Presentation, slide: usize, title: &str) -> Result<(), Error> {
-    let slide = pres
-        .slides
-        .get_mut(slide)
-        .ok_or(Error::OutOfRange(slide))?;
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
     let title = title.to_string();
 
     // 1) Prefer an existing title/centerTitle placeholder shape.
@@ -91,11 +91,12 @@ pub fn set_slide_title(pres: &mut Presentation, slide: usize, title: &str) -> Re
 }
 
 /// Set (or clear, with None) the speaker notes of a slide in place.
-pub fn set_slide_notes(pres: &mut Presentation, slide: usize, notes: Option<String>) -> Result<(), Error> {
-    let slide = pres
-        .slides
-        .get_mut(slide)
-        .ok_or(Error::OutOfRange(slide))?;
+pub fn set_slide_notes(
+    pres: &mut Presentation,
+    slide: usize,
+    notes: Option<String>,
+) -> Result<(), Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
     slide.notes = match notes {
         Some(n) if !n.trim().is_empty() => Some(text_body_from_string(&n)),
         _ => None,
@@ -104,11 +105,12 @@ pub fn set_slide_notes(pres: &mut Presentation, slide: usize, notes: Option<Stri
 }
 
 /// Set (or clear, with None) a slide's explicit background fill in place.
-pub fn set_slide_background(pres: &mut Presentation, slide: usize, fill: Option<office_toolkit::drawing::Fill>) -> Result<(), Error> {
-    let slide = pres
-        .slides
-        .get_mut(slide)
-        .ok_or(Error::OutOfRange(slide))?;
+pub fn set_slide_background(
+    pres: &mut Presentation,
+    slide: usize,
+    fill: Option<office_toolkit::drawing::Fill>,
+) -> Result<(), Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
     slide.background = fill;
     Ok(())
 }
@@ -136,7 +138,11 @@ pub fn delete_slide(pres: &mut Presentation, slide: usize) -> Result<(), Error> 
 
 /// Insert a new slide with an optional title at `index`. An index one past the
 /// end appends; anything farther is an error.
-pub fn add_slide_at(pres: &mut Presentation, index: usize, title: Option<String>) -> Result<usize, Error> {
+pub fn add_slide_at(
+    pres: &mut Presentation,
+    index: usize,
+    title: Option<String>,
+) -> Result<usize, Error> {
     if index > pres.slides.len() {
         return Err(Error::OutOfRange(index));
     }
@@ -189,16 +195,19 @@ pub fn reorder_shape_z_order(
     action: ZOrderAction,
 ) -> Result<bool, Error> {
     let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
-    let idx = slide.shapes.iter().position(|s| match s {
-        Shape::AutoShape(a) => a.id == shape_id,
-        Shape::Picture(p) => p.id == shape_id,
-        Shape::Chart(c) => c.id == shape_id,
-        Shape::Group(g) => g.id == shape_id,
-        Shape::Connector(c) => c.id == shape_id,
-        Shape::Table(t) => t.id == shape_id,
-        Shape::Media(m) => m.id == shape_id,
-    })
-    .ok_or(Error::ShapeNotFound(shape_id))?;
+    let idx = slide
+        .shapes
+        .iter()
+        .position(|s| match s {
+            Shape::AutoShape(a) => a.id == shape_id,
+            Shape::Picture(p) => p.id == shape_id,
+            Shape::Chart(c) => c.id == shape_id,
+            Shape::Group(g) => g.id == shape_id,
+            Shape::Connector(c) => c.id == shape_id,
+            Shape::Table(t) => t.id == shape_id,
+            Shape::Media(m) => m.id == shape_id,
+        })
+        .ok_or(Error::ShapeNotFound(shape_id))?;
 
     let n = slide.shapes.len();
     if n <= 1 {
@@ -241,19 +250,29 @@ pub fn reorder_shape_z_order(
 /// is laid out as one paragraph per line and inherits the shape's original
 /// first-paragraph and first-run formatting (alignment, font, size, color),
 /// so editing a run does not flatten the shape's style.
-pub fn update_text_run(pres: &mut Presentation, slide: usize, shape_id: u32, new_text: &str) -> Result<(), Error> {
+pub fn update_text_run(
+    pres: &mut Presentation,
+    slide: usize,
+    shape_id: u32,
+    new_text: &str,
+) -> Result<(), Error> {
     let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
-    let target = find_autoshape(&mut slide.shapes, shape_id).ok_or(Error::ShapeNotFound(shape_id))?;
-    let (para_props, run_props) = target.text_body.as_ref().map(|tb| {
-        let para_props = tb.paragraphs.first().and_then(|p| p.properties.clone());
-        let run_props = tb.paragraphs.iter().find_map(|p| {
-            p.runs.iter().find_map(|r| match r {
-                TextRun::Regular { properties, .. } => Some(properties.clone()),
-                _ => None,
-            })
-        });
-        (para_props, run_props)
-    }).unwrap_or_default();
+    let target =
+        find_autoshape(&mut slide.shapes, shape_id).ok_or(Error::ShapeNotFound(shape_id))?;
+    let (para_props, run_props) = target
+        .text_body
+        .as_ref()
+        .map(|tb| {
+            let para_props = tb.paragraphs.first().and_then(|p| p.properties.clone());
+            let run_props = tb.paragraphs.iter().find_map(|p| {
+                p.runs.iter().find_map(|r| match r {
+                    TextRun::Regular { properties, .. } => Some(properties.clone()),
+                    _ => None,
+                })
+            });
+            (para_props, run_props)
+        })
+        .unwrap_or_default();
     target.text_body = Some(rebuild_text_body(new_text, para_props, run_props));
     Ok(())
 }
@@ -295,7 +314,10 @@ fn rebuild_text_body(
         }
         if !line.is_empty() {
             let props = run_props.clone().unwrap_or_default();
-            para = para.with_run(TextRun::Regular { text: line.to_string(), properties: props });
+            para = para.with_run(TextRun::Regular {
+                text: line.to_string(),
+                properties: props,
+            });
         }
         body = body.with_paragraph(para);
     }
@@ -334,11 +356,15 @@ fn tb_text_is_empty(tb: &TextBody) -> bool {
 }
 
 fn next_shape_id(slide: &Slide) -> u32 {
-    let max = slide.shapes.iter().filter_map(|s| match s {
-        Shape::AutoShape(a) => Some(a.id),
-        Shape::Picture(p) => Some(p.id),
-        _ => None,
-    }).max().unwrap_or(1);
+    let max = slide
+        .shapes
+        .iter()
+        .filter_map(|s| match s {
+            Shape::AutoShape(a) => Some(a.id),
+            Shape::Picture(p) => Some(p.id),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(1);
     max + 1
 }
-

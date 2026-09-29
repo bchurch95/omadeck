@@ -40,8 +40,7 @@ fn fixture_path(name: &str) -> std::path::PathBuf {
 
 /// Map of `ppt/media/*` part name -> bytes inside a PPTX zip package.
 fn media_parts(path: &Path) -> BTreeMap<String, Vec<u8>> {
-    let file = fs::File::open(path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let file = fs::File::open(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let mut zip = zip::ZipArchive::new(file).expect("zip opens");
     let mut media = BTreeMap::new();
     for i in 0..zip.len() {

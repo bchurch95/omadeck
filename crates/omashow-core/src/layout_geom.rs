@@ -130,8 +130,8 @@ fn resolve_slide_map(pkg: &Package, slide_name: &str) -> PhMap {
         return PhMap::new();
     };
 
-    let master_part = rel_target_of(layout_part, "/ppt/slideLayouts", "slideMaster")
-        .and_then(|m| pkg.part(&m));
+    let master_part =
+        rel_target_of(layout_part, "/ppt/slideLayouts", "slideMaster").and_then(|m| pkg.part(&m));
 
     let sizes = master_part
         .map(part_str)
@@ -142,17 +142,26 @@ fn resolve_slide_map(pkg: &Package, slide_name: &str) -> PhMap {
     if let Some(master) = &master_part {
         if let Ok(xml) = std::str::from_utf8(&master.data) {
             for (key, bounds) in ph_table(xml) {
-                map.insert(key.clone(), PhGeom {
-                    bounds,
-                    font_size_100ths_pt: size_for_type(&sizes, &key.0),
-                });
+                map.insert(
+                    key.clone(),
+                    PhGeom {
+                        bounds,
+                        font_size_100ths_pt: size_for_type(&sizes, &key.0),
+                    },
+                );
             }
         }
     }
     if let Ok(xml) = std::str::from_utf8(&layout_part.data) {
         for (key, bounds) in ph_table(xml) {
             let size = size_for_type(&sizes, &key.0);
-            map.insert(key, PhGeom { bounds, font_size_100ths_pt: size });
+            map.insert(
+                key,
+                PhGeom {
+                    bounds,
+                    font_size_100ths_pt: size,
+                },
+            );
         }
     }
     map
@@ -161,12 +170,9 @@ fn resolve_slide_map(pkg: &Package, slide_name: &str) -> PhMap {
 /// The internal relationship target of kind `suffix` (e.g. `"slideLayout"`),
 /// resolved to an absolute part name.
 fn rel_target_of(part: &opc_ooxml::Part, base_dir: &str, suffix: &str) -> Option<String> {
-    let rel = part
-        .relationships
-        .iter()
-        .find(|r| {
-            r.rel_type.ends_with(suffix) && r.target_mode == opc_ooxml::TargetMode::Internal
-        })?;
+    let rel = part.relationships.iter().find(|r| {
+        r.rel_type.ends_with(suffix) && r.target_mode == opc_ooxml::TargetMode::Internal
+    })?;
     resolve_part(base_dir, &rel.target)
 }
 

@@ -197,16 +197,18 @@ mod tests {
     use office_toolkit::powerpoint::PlaceholderKind;
 
     fn slide_with_title(title: &str) -> Slide {
+        use crate::model::text_body_from_string;
         use office_toolkit::drawing::{ShapeProperties, Transform2D};
         use office_toolkit::powerpoint::{AutoShape, Placeholder, Shape};
-        use crate::model::text_body_from_string;
         let mut s = Slide::new();
         s.shapes.push(Shape::AutoShape(
             AutoShape::new(2, "Title")
                 .with_placeholder(Placeholder::new(PlaceholderKind::Title))
                 .with_properties(
                     ShapeProperties::new().with_transform(
-                        Transform2D::new().with_offset(685_800, 342_900).with_extent(10_820_400, 1_325_555),
+                        Transform2D::new()
+                            .with_offset(685_800, 342_900)
+                            .with_extent(10_820_400, 1_325_555),
                     ),
                 )
                 .with_text_body(text_body_from_string(title)),
@@ -217,10 +219,16 @@ mod tests {
     fn titles(pres: &Presentation) -> Vec<String> {
         pres.slides
             .iter()
-            .map(|s| s.shapes.iter().find_map(|sh| match sh {
-                Shape::AutoShape(a) => a.text_body.as_ref(),
-                _ => None,
-            }).map(crate::model::text_body_to_string).unwrap_or_default())
+            .map(|s| {
+                s.shapes
+                    .iter()
+                    .find_map(|sh| match sh {
+                        Shape::AutoShape(a) => a.text_body.as_ref(),
+                        _ => None,
+                    })
+                    .map(crate::model::text_body_to_string)
+                    .unwrap_or_default()
+            })
             .collect()
     }
 
@@ -287,12 +295,22 @@ mod tests {
         let mut pres = Presentation::new();
         pres.slides.push(slide_with_title("A"));
         let mut stack = UndoStack::new();
-        stack.record(UndoCommand::Notes { slide: 0, before: None, after: None, description: "n1".into() });
+        stack.record(UndoCommand::Notes {
+            slide: 0,
+            before: None,
+            after: None,
+            description: "n1".into(),
+        });
         assert!(stack.can_undo());
         stack.undo(&mut pres).unwrap();
         assert!(stack.can_redo());
 
-        stack.record(UndoCommand::Notes { slide: 0, before: None, after: None, description: "n2".into() });
+        stack.record(UndoCommand::Notes {
+            slide: 0,
+            before: None,
+            after: None,
+            description: "n2".into(),
+        });
         assert!(!stack.can_redo(), "a new command must drop the redo side");
     }
 
@@ -303,7 +321,12 @@ mod tests {
         let mut stack = UndoStack::new();
 
         let before = pres.slides[0].shapes.clone();
-        stack.record(UndoCommand::Shapes { slide: 0, before: before.clone(), after: Vec::new(), description: "clear shapes".into() });
+        stack.record(UndoCommand::Shapes {
+            slide: 0,
+            before: before.clone(),
+            after: Vec::new(),
+            description: "clear shapes".into(),
+        });
         pres.slides[0].shapes.clear();
         assert!(pres.slides[0].shapes.is_empty());
 

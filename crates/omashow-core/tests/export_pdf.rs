@@ -14,8 +14,14 @@ fn pdf_page_count(bytes: &[u8]) -> usize {
 
 fn assert_valid_pdf(bytes: &[u8], expected_pages: usize) {
     assert!(bytes.starts_with(b"%PDF-1."), "missing PDF header");
-    assert!(bytes.ends_with(b"%%EOF") || bytes.ends_with(b"%%EOF\n"), "missing EOF marker");
-    assert!(count_occurrences(bytes, b"MediaBox") >= expected_pages, "missing MediaBox");
+    assert!(
+        bytes.ends_with(b"%%EOF") || bytes.ends_with(b"%%EOF\n"),
+        "missing EOF marker"
+    );
+    assert!(
+        count_occurrences(bytes, b"MediaBox") >= expected_pages,
+        "missing MediaBox"
+    );
     assert_eq!(pdf_page_count(bytes), expected_pages, "wrong page count");
 }
 
@@ -35,7 +41,9 @@ fn exports_embedded_images() {
     let bytes = doc.export_pdf_bytes().unwrap();
     assert_valid_pdf(&bytes, expected);
     assert!(
-        count_occurrences(&bytes, b"/Subtype /Image") + count_occurrences(&bytes, b"/Subtype/Image") > 0,
+        count_occurrences(&bytes, b"/Subtype /Image")
+            + count_occurrences(&bytes, b"/Subtype/Image")
+            > 0,
         "no image XObjects embedded"
     );
 }
@@ -53,7 +61,11 @@ fn exports_multi_slide_deck_with_shapes() {
 #[test]
 fn export_to_file_writes_pdf() {
     let doc = PptxDocument::open("tests/fixtures/m365_with_master.bin").unwrap();
-    let path = std::env::temp_dir().join(format!("omashow-export-{}-{}.pdf", std::process::id(), uuid_suffix()));
+    let path = std::env::temp_dir().join(format!(
+        "omashow-export-{}-{}.pdf",
+        std::process::id(),
+        uuid_suffix()
+    ));
     doc.export_pdf(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     assert_valid_pdf(&bytes, doc.slide_count());
@@ -62,5 +74,11 @@ fn export_to_file_writes_pdf() {
 
 fn uuid_suffix() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    format!("{:x}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos())
+    format!(
+        "{:x}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    )
 }

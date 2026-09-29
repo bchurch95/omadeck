@@ -3,9 +3,11 @@
 
 use std::io::Read as _;
 
-use omashow_core::{model_of, PptxDocument};
-use office_toolkit::drawing::{Color, Fill, ShapeProperties, TextBody, TextParagraph, TextRun, Transform2D};
+use office_toolkit::drawing::{
+    Color, Fill, ShapeProperties, TextBody, TextParagraph, TextRun, Transform2D,
+};
 use office_toolkit::powerpoint::{AutoShape, Placeholder, PlaceholderKind, Shape, Slide};
+use omashow_core::{model_of, PptxDocument};
 
 fn tb(s: &str) -> TextBody {
     TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text(s)))
@@ -19,24 +21,22 @@ fn deck(dir: &std::path::Path, name: &str) -> (PptxDocument, std::path::PathBuf)
         let title = AutoShape::new(2 + i as u32, "Title")
             .with_placeholder(Placeholder::new(PlaceholderKind::Title))
             .with_properties(
-                ShapeProperties::new()
-                    .with_transform(
-                        Transform2D::new()
-                            .with_offset(1_000_000, 1_000_000)
-                            .with_extent(7_000_000, 900_000),
-                    ),
+                ShapeProperties::new().with_transform(
+                    Transform2D::new()
+                        .with_offset(1_000_000, 1_000_000)
+                        .with_extent(7_000_000, 900_000),
+                ),
             )
             .with_text_body(tb(&format!("T{i}")));
-        let box_ = AutoShape::new(10 + i as u32, "Box")
-            .with_properties(
-                ShapeProperties::new()
-                    .with_transform(
-                        Transform2D::new()
-                            .with_offset(1_000_000, 3_000_000)
-                            .with_extent(2_000_000, 1_000_000),
-                    )
-                    .with_fill(Fill::Solid(Color::Rgb("AA0000".to_string()))),
-            );
+        let box_ = AutoShape::new(10 + i as u32, "Box").with_properties(
+            ShapeProperties::new()
+                .with_transform(
+                    Transform2D::new()
+                        .with_offset(1_000_000, 3_000_000)
+                        .with_extent(2_000_000, 1_000_000),
+                )
+                .with_fill(Fill::Solid(Color::Rgb("AA0000".to_string()))),
+        );
         let slide = Slide::new()
             .with_shape(Shape::AutoShape(title))
             .with_shape(Shape::AutoShape(box_));
@@ -123,7 +123,10 @@ fn theme_remaps_colors_in_saved_slides() {
 
     let mut saw_remap = false;
     for (_name, xml) in slide_xmls(&out) {
-        assert!(!xml.to_lowercase().contains("val=\"aa0000\""), "source color leaked");
+        assert!(
+            !xml.to_lowercase().contains("val=\"aa0000\""),
+            "source color leaked"
+        );
         if xml.to_lowercase().contains("val=\"112233\"") {
             saw_remap = true;
         }
@@ -146,11 +149,17 @@ fn theme_remap_is_case_insensitive_and_single_pass() {
         .unwrap();
     let out = dir.join("theme_ci_out.pptx");
     d.save(&out).unwrap();
-    let joined: String = slide_xmls(&out).iter().map(|(_, x)| x.to_lowercase()).collect();
-    assert!(!joined.contains("val=\"aa0000\""), "case-insensitive match failed");
+    let joined: String = slide_xmls(&out)
+        .iter()
+        .map(|(_, x)| x.to_lowercase())
+        .collect();
+    assert!(
+        !joined.contains("val=\"aa0000\""),
+        "case-insensitive match failed"
+    );
     assert!(joined.contains("val=\"112233\""), "remap not applied");
     assert!(text.contains("AABBCC")); // sanity: the fixture shape color differs
-    // A second, unrelated color in the same parts must be untouched.
+                                      // A second, unrelated color in the same parts must be untouched.
     let _ = joined;
 }
 
@@ -160,7 +169,9 @@ fn theme_rejects_bad_hex() {
     std::fs::create_dir_all(&dir).unwrap();
     let (d, _) = deck(&dir, "theme_bad.pptx");
     let mut d = d;
-    assert!(d.apply_theme(vec![("zzz".to_string(), "112233".to_string())]).is_err());
+    assert!(d
+        .apply_theme(vec![("zzz".to_string(), "112233".to_string())])
+        .is_err());
     assert!(d
         .apply_theme(vec![("aa0000".to_string(), "1122".to_string())])
         .is_err());
@@ -186,6 +197,12 @@ fn theme_persists_across_reopen() {
         .filter_map(|s| s.fill.clone())
         .map(|f| f.to_lowercase())
         .collect();
-    assert!(fills.iter().any(|f| f.contains("112233")), "persisted fill missing: {fills:?}");
-    assert!(!fills.iter().any(|f| f.contains("aa0000")), "old fill still present: {fills:?}");
+    assert!(
+        fills.iter().any(|f| f.contains("112233")),
+        "persisted fill missing: {fills:?}"
+    );
+    assert!(
+        !fills.iter().any(|f| f.contains("aa0000")),
+        "old fill still present: {fills:?}"
+    );
 }

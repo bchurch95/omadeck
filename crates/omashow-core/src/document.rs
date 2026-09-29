@@ -138,14 +138,16 @@ impl PptxDocument {
     /// descended from an original file slide carrying inherited placeholders.
     fn geom_for(&self, slide: usize) -> Option<&PhMap> {
         let ordinal = *self.slide_ordinals.get(slide)?.as_ref()?;
-        self.geom_by_ordinal
-            .get(ordinal)
-            .filter(|m| !m.is_empty())
+        self.geom_by_ordinal.get(ordinal).filter(|m| !m.is_empty())
     }
 
     /// Set a slide's title in place (undoable).
     pub fn set_title(&mut self, slide: usize, title: &str) -> Result<(), Error> {
-        let before = self.pres.slides.get(slide).map(|s| s.shapes.clone())
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
             .ok_or(Error::OutOfRange(slide))?;
         crate::set_slide_title(&mut self.pres, slide, title)?;
         self.history.record(UndoCommand::Shapes {
@@ -160,7 +162,11 @@ impl PptxDocument {
 
     /// Set (or clear) a slide's speaker notes in place (undoable).
     pub fn set_notes(&mut self, slide: usize, notes: Option<String>) -> Result<(), Error> {
-        let before = self.pres.slides.get(slide).map(|s| s.notes.clone())
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.notes.clone())
             .ok_or(Error::OutOfRange(slide))?;
         crate::set_slide_notes(&mut self.pres, slide, notes)?;
         self.history.record(UndoCommand::Notes {
@@ -174,11 +180,7 @@ impl PptxDocument {
     }
 
     /// Set (or clear, with None) a slide's explicit background fill (undoable).
-    pub fn set_slide_background(
-        &mut self,
-        slide: usize,
-        fill: Option<Fill>,
-    ) -> Result<(), Error> {
+    pub fn set_slide_background(&mut self, slide: usize, fill: Option<Fill>) -> Result<(), Error> {
         let before = self
             .pres
             .slides
@@ -203,7 +205,12 @@ impl PptxDocument {
 
     /// Insert a new slide at `index` (optionally titled) and return its index (undoable).
     pub fn add_slide_at(&mut self, index: usize, title: Option<String>) -> Result<usize, Error> {
-        let before = self.pres.slides.get(index..).map(|t| t.to_vec()).ok_or(Error::OutOfRange(index))?;
+        let before = self
+            .pres
+            .slides
+            .get(index..)
+            .map(|t| t.to_vec())
+            .ok_or(Error::OutOfRange(index))?;
         let idx = crate::add_slide_at(&mut self.pres, index, title)?;
         self.slide_ordinals.insert(idx, None);
         self.record_slice_change(idx, before, "add slide");
@@ -212,7 +219,12 @@ impl PptxDocument {
 
     /// Remove a slide by index (undoable).
     pub fn delete_slide(&mut self, slide: usize) -> Result<(), Error> {
-        let before = self.pres.slides.get(slide..).map(|t| t.to_vec()).ok_or(Error::OutOfRange(slide))?;
+        let before = self
+            .pres
+            .slides
+            .get(slide..)
+            .map(|t| t.to_vec())
+            .ok_or(Error::OutOfRange(slide))?;
         crate::delete_slide(&mut self.pres, slide)?;
         self.slide_ordinals.remove(slide);
         self.record_slice_change(slide, before, "delete slide");
@@ -281,7 +293,8 @@ impl PptxDocument {
         let ord_before = self.slide_ordinals.clone();
         crate::move_slide(&mut self.pres, from, to)?;
         let ordinal = self.slide_ordinals.remove(from);
-        self.slide_ordinals.insert(to.min(self.slide_ordinals.len()), ordinal);
+        self.slide_ordinals
+            .insert(to.min(self.slide_ordinals.len()), ordinal);
         self.history.record(UndoCommand::Slides {
             from: 0,
             before,
@@ -295,8 +308,17 @@ impl PptxDocument {
     }
 
     /// Replace the text of a shape on a slide, keeping its base formatting (undoable).
-    pub fn update_text_run(&mut self, slide: usize, shape_id: u32, new_text: &str) -> Result<(), Error> {
-        let before = self.pres.slides.get(slide).map(|s| s.shapes.clone())
+    pub fn update_text_run(
+        &mut self,
+        slide: usize,
+        shape_id: u32,
+        new_text: &str,
+    ) -> Result<(), Error> {
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
             .ok_or(Error::OutOfRange(slide))?;
         crate::update_text_run(&mut self.pres, slide, shape_id, new_text)?;
         self.history.record(UndoCommand::Shapes {
@@ -320,7 +342,11 @@ impl PptxDocument {
         shape_id: u32,
         action: crate::ZOrderAction,
     ) -> Result<bool, Error> {
-        let before = self.pres.slides.get(slide).map(|s| s.shapes.clone())
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
             .ok_or(Error::OutOfRange(slide))?;
         let changed = crate::reorder_shape_z_order(&mut self.pres, slide, shape_id, action)?;
         // Boundary no-ops leave the order untouched; skip the history record
@@ -355,7 +381,10 @@ impl PptxDocument {
     /// Undoes the most recent mutation; returns its description.
     pub fn undo(&mut self) -> Option<String> {
         let command = self.history.undo(&mut self.pres)?;
-        if let UndoCommand::Slides { from, ord_before, .. } = &command {
+        if let UndoCommand::Slides {
+            from, ord_before, ..
+        } = &command
+        {
             self.splice_ordinals(*from, ord_before);
         }
         self.dirty = true;
@@ -365,7 +394,10 @@ impl PptxDocument {
     /// Re-applies the most recently undone mutation; returns its description.
     pub fn redo(&mut self) -> Option<String> {
         let command = self.history.redo(&mut self.pres)?;
-        if let UndoCommand::Slides { from, ord_after, .. } = &command {
+        if let UndoCommand::Slides {
+            from, ord_after, ..
+        } = &command
+        {
             self.splice_ordinals(*from, ord_after);
         }
         self.dirty = true;
@@ -437,7 +469,10 @@ fn remap_package_colors(pkg: &mut Package, map: &[(String, String)]) {
         .iter()
         .map(|(f, t)| {
             (
-                format!("val=\"{}\"", f).to_ascii_lowercase().chars().collect(),
+                format!("val=\"{}\"", f)
+                    .to_ascii_lowercase()
+                    .chars()
+                    .collect(),
                 format!("val=\"{}\"", t),
             )
         })
@@ -472,7 +507,10 @@ fn remap_colors_ci(text: &str, needles: &[(Vec<char>, String)], needle_len: usiz
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     while i + needle_len <= lower.len() {
-        match needles.iter().find(|(n, _)| &lower[i..i + needle_len] == n.as_slice()) {
+        match needles
+            .iter()
+            .find(|(n, _)| &lower[i..i + needle_len] == n.as_slice())
+        {
             Some((_, repl)) => {
                 out.push_str(repl);
                 i += needle_len;
@@ -521,7 +559,11 @@ fn merge_and_write(
         if merged.part(&target_part).is_none() {
             continue; // external target or a part we didn't preserve
         }
-        if merged.relationships().iter().any(|r| r.target == rel.target) {
+        if merged
+            .relationships()
+            .iter()
+            .any(|r| r.target == rel.target)
+        {
             continue; // already referenced by the writer
         }
         merged.add_relationship(Relationship {
@@ -543,7 +585,10 @@ fn merge_and_write(
 fn next_rid(rels: &opc_ooxml::Relationships) -> String {
     let max = rels
         .iter()
-        .filter_map(|r| r.id.strip_prefix("rId").and_then(|n| n.parse::<usize>().ok()))
+        .filter_map(|r| {
+            r.id.strip_prefix("rId")
+                .and_then(|n| n.parse::<usize>().ok())
+        })
         .max()
         .unwrap_or(0);
     format!("rId{}", max + 1)

@@ -161,11 +161,7 @@ fn font_stack(family: Option<&str>) -> String {
         {
             "\"Times New Roman\", Georgia, serif"
         }
-        Some(f)
-            if f.contains("mono")
-                || f.contains("courier")
-                || f.contains("consolas") =>
-        {
+        Some(f) if f.contains("mono") || f.contains("courier") || f.contains("consolas") => {
             "Consolas, \"Courier New\", monospace"
         }
         _ => "\"Segoe UI\", Arial, Helvetica, sans-serif",

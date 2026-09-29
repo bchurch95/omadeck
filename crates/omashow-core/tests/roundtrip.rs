@@ -1,6 +1,6 @@
-use omashow_core::*;
 use office_toolkit::drawing::{ShapeProperties, TextBody, TextParagraph, TextRun, Transform2D};
 use office_toolkit::powerpoint::{AutoShape, Picture, PictureFormat, Shape, Slide};
+use omashow_core::*;
 
 fn tb(s: &str) -> TextBody {
     TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text(s)))
@@ -17,7 +17,8 @@ fn slide_shape_texts(pres: &Presentation, i: usize) -> Vec<String> {
                     t.paragraphs
                         .iter()
                         .map(|p| {
-                            p.runs.iter()
+                            p.runs
+                                .iter()
                                 .filter_map(|r| match r {
                                     TextRun::Regular { text, .. } => Some(text.clone()),
                                     _ => None,
@@ -42,14 +43,22 @@ fn lossless_title_edit_roundtrip() {
 
     // 1) Build a deck with a title, a body box, and speaker notes.
     let title = AutoShape::new(2, "Title")
-        .with_properties(ShapeProperties::new().with_transform(Transform2D::new()
-            .with_offset(1_000_000, 1_000_000)
-            .with_extent(7_772_400, 1_200_150)))
+        .with_properties(
+            ShapeProperties::new().with_transform(
+                Transform2D::new()
+                    .with_offset(1_000_000, 1_000_000)
+                    .with_extent(7_772_400, 1_200_150),
+            ),
+        )
         .with_text_body(tb("Original Title"));
     let body = AutoShape::new(3, "Body")
-        .with_properties(ShapeProperties::new().with_transform(Transform2D::new()
-            .with_offset(1_000_000, 2_500_000)
-            .with_extent(7_772_400, 4_000_000)))
+        .with_properties(
+            ShapeProperties::new().with_transform(
+                Transform2D::new()
+                    .with_offset(1_000_000, 2_500_000)
+                    .with_extent(7_772_400, 4_000_000),
+            ),
+        )
         .with_text_body(tb("Body content must survive the edit"));
     let slide1 = Slide::new()
         .with_shape(Shape::AutoShape(title))
@@ -76,21 +85,33 @@ fn lossless_title_edit_roundtrip() {
     let texts = slide_shape_texts(&final_pres, 0);
 
     // Title changed…
-    assert!(texts.contains(&"Edited Title".to_string()), "title: {texts:?}");
+    assert!(
+        texts.contains(&"Edited Title".to_string()),
+        "title: {texts:?}"
+    );
     // …but the body and notes are still there (lossless).
-    assert!(texts.contains(&"Body content must survive the edit".to_string()), "body: {texts:?}");
+    assert!(
+        texts.contains(&"Body content must survive the edit".to_string()),
+        "body: {texts:?}"
+    );
     let notes = final_pres.slides[0].notes.as_ref().map(|t| {
-        t.paragraphs.iter()
-            .flat_map(|p| p.runs.iter().filter_map(|r| match r {
-                TextRun::Regular { text, .. } => Some(text.clone()),
-                _ => None,
-            }))
+        t.paragraphs
+            .iter()
+            .flat_map(|p| {
+                p.runs.iter().filter_map(|r| match r {
+                    TextRun::Regular { text, .. } => Some(text.clone()),
+                    _ => None,
+                })
+            })
             .collect::<String>()
     });
     assert_eq!(notes.as_deref(), Some("Speaker note that must survive"));
 
     // Second slide untouched.
-    assert_eq!(model_of(&final_pres).slides[1].title.as_deref(), Some("Second slide"));
+    assert_eq!(
+        model_of(&final_pres).slides[1].title.as_deref(),
+        Some("Second slide")
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -108,17 +129,26 @@ fn picture_survives_roundtrip() {
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("pic.pptx").to_string_lossy().to_string();
 
-    let pic = Picture::new(7, "logo", TINY_PNG, PictureFormat::Png, 3_000_000, 3_000_000)
-        .with_offset(1_000_000, 1_000_000);
+    let pic = Picture::new(
+        7,
+        "logo",
+        TINY_PNG,
+        PictureFormat::Png,
+        3_000_000,
+        3_000_000,
+    )
+    .with_offset(1_000_000, 1_000_000);
     let slide = Slide::new()
-        .with_shape(Shape::AutoShape(AutoShape::new(2, "Title").with_text_body(tb("Deck with image"))))
+        .with_shape(Shape::AutoShape(
+            AutoShape::new(2, "Title").with_text_body(tb("Deck with image")),
+        ))
         .with_shape(Shape::Picture(pic));
     save_presentation(&path, &Presentation::new().with_slide(slide)).unwrap();
 
     let reopened = open_pptx_full(&path).unwrap();
-    let has_picture = reopened.slides[0].shapes.iter().any(|s| {
-        matches!(s, Shape::Picture(p) if p.data == TINY_PNG && p.format == PictureFormat::Png)
-    });
+    let has_picture = reopened.slides[0].shapes.iter().any(
+        |s| matches!(s, Shape::Picture(p) if p.data == TINY_PNG && p.format == PictureFormat::Png),
+    );
     assert!(has_picture, "embedded picture lost on round-trip");
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -134,8 +164,8 @@ fn picture_survives_roundtrip() {
 ///    while applying the edit.
 #[test]
 fn lossless_merge_preserves_unknown_parts() {
+    use opc_ooxml::{Package, Part};
     use std::io::{Cursor, Write};
-    use opc_ooxml::{Part, Package};
 
     let dir = std::env::temp_dir().join("omashow_parts");
     std::fs::create_dir_all(&dir).unwrap();
@@ -165,9 +195,14 @@ fn lossless_merge_preserves_unknown_parts() {
              xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><p:cSld name=\"Extra\"/></p:sldLayout>"
                 .to_vec(),
         ));
-        pkg.add_part(Part::new("/ppt/media/sound1.wav", "audio/wav", vec![0x52, 0x49, 0x46, 0x46]));
+        pkg.add_part(Part::new(
+            "/ppt/media/sound1.wav",
+            "audio/wav",
+            vec![0x52, 0x49, 0x46, 0x46],
+        ));
         let mut out = std::fs::File::create(&path).unwrap();
-        out.write_all(pkg.write_to(Cursor::new(Vec::new())).unwrap().get_ref()).unwrap();
+        out.write_all(pkg.write_to(Cursor::new(Vec::new())).unwrap().get_ref())
+            .unwrap();
     }
 
     let before = std::fs::read(&path).unwrap();
@@ -176,7 +211,11 @@ fn lossless_merge_preserves_unknown_parts() {
     let doc = PptxDocument::open(&path).unwrap();
     let noop = dir.join("noop.pptx");
     doc.save(&noop).unwrap();
-    assert_eq!(std::fs::read(&noop).unwrap(), before, "unmodified save must be byte-identical");
+    assert_eq!(
+        std::fs::read(&noop).unwrap(),
+        before,
+        "unmodified save must be byte-identical"
+    );
 
     // Case 2: edited save preserves the unknown parts AND applies the edit.
     let mut doc = PptxDocument::open(&path).unwrap();
@@ -188,8 +227,13 @@ fn lossless_merge_preserves_unknown_parts() {
     // type (Package::read_from rejects a part without one).
     let edited_bytes = std::fs::read(&edited).unwrap();
     let pkg = Package::read_from(Cursor::new(&edited_bytes)).unwrap();
-    let branding = pkg.part("/custom/branding.xml").expect("custom part lost on save");
-    assert_eq!(branding.content_type, "application/vnd.omashow.branding+xml");
+    let branding = pkg
+        .part("/custom/branding.xml")
+        .expect("custom part lost on save");
+    assert_eq!(
+        branding.content_type,
+        "application/vnd.omashow.branding+xml"
+    );
     assert_eq!(branding.data, b"<branding>omarchy</branding>");
     assert!(
         pkg.part("/ppt/slideLayouts/slideLayout2.xml").is_some(),
@@ -202,7 +246,10 @@ fn lossless_merge_preserves_unknown_parts() {
 
     // And the edit landed.
     let pres2 = open_pptx_full(edited.to_str().unwrap()).unwrap();
-    assert_eq!(model_of(&pres2).slides[0].title.as_deref(), Some("Edited Title"));
+    assert_eq!(
+        model_of(&pres2).slides[0].title.as_deref(),
+        Some("Edited Title")
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
