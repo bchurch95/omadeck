@@ -69,8 +69,17 @@
   - Build Inspector with Build In/Out timing (`At time`, `On click`, `With/After previous`), duration, and easing curves.
   - Morph slide transitions: automatically detect matching shape names/IDs across consecutive slides and interpolate position, scale, and opacity smoothly.
 
+### 🔍 Architect & Critic Feedback (Commit 095fe3c - Score: 7/10)
+- [ ] [Critic] Replace .unwrap()/.expect() calls in inspect.rs media-relationship resolution with typed Result<_, Error::MediaRelationMissing> returns and add a unit test for a <p:media> node with a dangling rId.
+- [ ] [Critic] Restore the Z-Order task spec by moving it to a separate file (e.g., TASKS/z-order.md) instead of overwriting CURRENT_TASK.md, preserving the design notes for Milestone 10.
+- [ ] [Critic] Add a try/catch or .catch() guard around media element creation in slide_render.js so a corrupt or missing media blob does not abort the entire slide render loop.
+- [ ] [Critic] In audience.js, add a cleanup hook on slide-advance that calls .pause() and .remove() on all active <audio>/<video> elements to prevent orphaned DOM nodes and audio bleed-through.
+- [ ] [Critic] Override default browser <video> controls with custom dark-slate-styled controls (play/pause, progress, mute) in both index.html and audience.html to maintain native desktop visual consistency.
+- [ ] [Critic] Add a visual regression snapshot test (or manual checklist item) verifying that media shape thumbnails in the editor display a recognizable media-type icon overlay distinct from picture shapes.
+- [ ] [Critic] Verify in inspect.rs that unknown child elements and namespaces within <p:media>/<p:audio> are serialized back verbatim during OOXML roundtrip; add a roundtrip test with a deliberately unknown namespace child.
+
 ## Milestone 9: Rich Media, Audio/Video & Tables
-- [ ] Embedded Audio & Video Playback: Play slide media parts (`ppt/media/*.mp4`, `.wav`) with auto-play on slide entry, looping, and pause controls.
+- [x] Embedded Audio & Video Playback: Play slide media parts (`ppt/media/*.mp4`, `.wav`) with auto-play on slide entry, looping, and pause controls. (`inspect.rs` `MediaInfo { media_type, data_uri, size_bytes }` on `ShapeInfo.media`; shared `drawMediaShape()` in slide_render.js renders a positioned, looping, muted-autoplay `<video>` with pause/unmute control bar or a native-controls `<audio>`, with ▶/♪ glyph thumbnails in filmstrip/sorter/next-preview. Wired into editor canvas, presenter console, and audience window.)
 - [x] Table Support (`a:tbl`): Extract, render, and format OpenXML tables with column widths, borders, cell margins, and background fills.
 - [x] Smart Magnetic Connectors: Lines and arrows that dynamically anchor between shape boundary points and adjust when shapes move.
 
