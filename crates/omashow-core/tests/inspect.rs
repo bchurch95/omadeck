@@ -4,17 +4,17 @@
 
 use std::io::Cursor;
 
-use omashow_core::{
-    get_slide_shapes, slide_background, slide_count, slide_dimensions, BoundingBox, LineInfo,
-    PptxDocument,
-};
 use office_toolkit::drawing::{
-    Color, Fill, Line, ShapeProperties, TextAlign, TextBody, TextParagraph, TextParagraphProperties,
-    TextRun, TextRunProperties, Transform2D,
+    Color, Fill, Line, ShapeProperties, TextAlign, TextBody, TextParagraph,
+    TextParagraphProperties, TextRun, TextRunProperties, Transform2D,
 };
 use office_toolkit::powerpoint::{
-    AutoShape, Connector, Picture, PictureFormat, Placeholder, PlaceholderKind, Presentation,
-    Shape, ShapeGroup, Slide,
+    AutoShape, Connector, MediaFormat, Picture, PictureFormat, Placeholder, PlaceholderKind,
+    Presentation, Shape, ShapeGroup, Slide, SlideMedia,
+};
+use omashow_core::{
+    get_slide_shapes, open_pptx_full, save_presentation, slide_background, slide_count,
+    slide_dimensions, BoundingBox, LineInfo, PptxDocument,
 };
 
 fn title_body() -> TextBody {
@@ -44,7 +44,10 @@ fn title_body() -> TextBody {
     let p2 = TextParagraph::new()
         .with_properties(TextParagraphProperties::new().with_alignment(TextAlign::Center))
         .with_run(TextRun::text("Centered"));
-    TextBody::new().with_paragraph(p0).with_paragraph(p1).with_paragraph(p2)
+    TextBody::new()
+        .with_paragraph(p0)
+        .with_paragraph(p1)
+        .with_paragraph(p2)
 }
 
 /// A two-slide deck: a titled slide with a text box, a picture, and a
@@ -67,7 +70,11 @@ fn fixture_deck() -> Presentation {
         .with_text_box(true)
         .with_properties(
             ShapeProperties::new()
-                .with_transform(Transform2D::new().with_offset(500, 300).with_extent(200, 100))
+                .with_transform(
+                    Transform2D::new()
+                        .with_offset(500, 300)
+                        .with_extent(200, 100),
+                )
                 .with_fill(Fill::Solid(Color::Rgb("00FF00".to_string())))
                 .with_line(
                     Line::new()
@@ -75,28 +82,25 @@ fn fixture_deck() -> Presentation {
                         .with_fill(Fill::Solid(Color::Rgb("0000FF".to_string()))),
                 ),
         )
-        .with_text_body(TextBody::new().with_paragraph(TextParagraph::new().with_run(
-            TextRun::text("Box"),
-        )));
+        .with_text_body(
+            TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text("Box"))),
+        );
 
-    let pic = Picture::new(
-        4,
-        "pic",
-        [0u8; 3],
-        PictureFormat::Png,
-        1_000_000,
-        2_000_000,
-    )
-    .with_offset(10_000_000, 5_000_000)
-    .with_shape_properties(
-        ShapeProperties::new().with_line(
-            Line::new().with_width_emu(25400).with_fill(Fill::Solid(Color::Rgb("000000".to_string()))),
-        ),
-    );
+    let pic = Picture::new(4, "pic", [0u8; 3], PictureFormat::Png, 1_000_000, 2_000_000)
+        .with_offset(10_000_000, 5_000_000)
+        .with_shape_properties(
+            ShapeProperties::new().with_line(
+                Line::new()
+                    .with_width_emu(25400)
+                    .with_fill(Fill::Solid(Color::Rgb("000000".to_string()))),
+            ),
+        );
 
     let child = AutoShape::new(5, "Child").with_properties(
         ShapeProperties::new().with_transform(
-            Transform2D::new().with_offset(100, 50).with_extent(100, 100),
+            Transform2D::new()
+                .with_offset(100, 50)
+                .with_extent(100, 100),
         ),
     );
     let group = ShapeGroup::new(6, "Group")
@@ -155,7 +159,10 @@ fn assert_slide0_inspection(pres: &Presentation) {
             height_emu: 1_000_000,
         })
     );
-    assert_eq!(title.text.as_deref(), Some("Hello World\nSecond\nline\nCentered"));
+    assert_eq!(
+        title.text.as_deref(),
+        Some("Hello World\nSecond\nline\nCentered")
+    );
     assert_eq!(title.runs.len(), 6);
     assert_eq!(title.runs[0].text, "Hello ");
     assert!(title.runs[0].bold);
@@ -376,10 +383,9 @@ fn slide_shapes_serialize_to_json() {
 fn picture_media_data_roundtrips() {
     use base64::Engine as _;
     let png = [
-        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
-        8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96,
-        248, 95, 15, 0, 2, 135, 1, 128, 235, 71, 186, 146, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66,
-        96, 130,
+        137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6,
+        0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 96, 248, 95, 15,
+        0, 2, 135, 1, 128, 235, 71, 186, 146, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
     ];
 
     // In-memory fixture: a 3-byte "png" payload.
@@ -429,7 +435,8 @@ fn picture_media_data_roundtrips() {
 fn table_extraction_and_grid_info() {
     use office_toolkit::powerpoint::{SlideTable, TableCell, TableRow};
 
-    let tb = |s: &str| TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text(s)));
+    let tb =
+        |s: &str| TextBody::new().with_paragraph(TextParagraph::new().with_run(TextRun::text(s)));
 
     let cell1 = TableCell::new().with_text_body(tb("Header 1"));
     let cell2 = TableCell::new().with_text_body(tb("Header 2"));
@@ -474,10 +481,18 @@ fn table_extraction_and_grid_info() {
 fn connector_extraction_with_connections() {
     // Two boxes the connector will link, plus the connector itself.
     let box_a = AutoShape::new(1, "Box A").with_properties(
-        ShapeProperties::new().with_transform(Transform2D::new().with_offset(1_000_000, 1_000_000).with_extent(2_000_000, 1_000_000)),
+        ShapeProperties::new().with_transform(
+            Transform2D::new()
+                .with_offset(1_000_000, 1_000_000)
+                .with_extent(2_000_000, 1_000_000),
+        ),
     );
     let box_b = AutoShape::new(2, "Box B").with_properties(
-        ShapeProperties::new().with_transform(Transform2D::new().with_offset(5_000_000, 1_000_000).with_extent(2_000_000, 1_000_000)),
+        ShapeProperties::new().with_transform(
+            Transform2D::new()
+                .with_offset(5_000_000, 1_000_000)
+                .with_extent(2_000_000, 1_000_000),
+        ),
     );
     // A straight connector whose start is attached to Box A's site 0 and whose
     // end is attached to Box B's site 2, with a 28,000 EMU (2.5 pt) outline.
@@ -485,15 +500,24 @@ fn connector_extraction_with_connections() {
         .with_properties(
             ShapeProperties::new()
                 .with_transform(
-                    Transform2D::new().with_offset(3_000_000, 1_500_000).with_extent(2_000_000, 0),
+                    Transform2D::new()
+                        .with_offset(3_000_000, 1_500_000)
+                        .with_extent(2_000_000, 0),
                 )
-                .with_line(Line::new().with_width_emu(28_000).with_fill(Fill::Solid(Color::Rgb("787878".to_string())))),
+                .with_line(
+                    Line::new()
+                        .with_width_emu(28_000)
+                        .with_fill(Fill::Solid(Color::Rgb("787878".to_string()))),
+                ),
         )
         .with_start_connection(1, 0)
         .with_end_connection(2, 2);
 
     let mut pres = Presentation::new();
-    let slide = Slide::new().with_shape(Shape::AutoShape(box_a)).with_shape(Shape::AutoShape(box_b)).with_shape(Shape::Connector(connector));
+    let slide = Slide::new()
+        .with_shape(Shape::AutoShape(box_a))
+        .with_shape(Shape::AutoShape(box_b))
+        .with_shape(Shape::Connector(connector));
     pres.slides.push(slide);
 
     let shapes = get_slide_shapes(&pres, 0).expect("slide shapes");
@@ -526,12 +550,13 @@ fn connector_extraction_with_connections() {
 fn connector_without_connections_is_floating() {
     // A connector with no start/end attachment: `connector` is still present
     // (it is a connector), but both ends are `None`.
-    let connector = Connector::new(7, "Floating")
-        .with_properties(
-            ShapeProperties::new().with_transform(
-                Transform2D::new().with_offset(1_000_000, 2_000_000).with_extent(4_000_000, 300_000),
-            ),
-        );
+    let connector = Connector::new(7, "Floating").with_properties(
+        ShapeProperties::new().with_transform(
+            Transform2D::new()
+                .with_offset(1_000_000, 2_000_000)
+                .with_extent(4_000_000, 300_000),
+        ),
+    );
 
     let mut pres = Presentation::new();
     let slide = Slide::new().with_shape(Shape::Connector(connector));
@@ -541,7 +566,10 @@ fn connector_without_connections_is_floating() {
     assert_eq!(shapes.len(), 1);
     let cx = &shapes[0];
     assert_eq!(cx.kind, "connector");
-    let info = cx.connector.as_ref().expect("connector info present even when floating");
+    let info = cx
+        .connector
+        .as_ref()
+        .expect("connector info present even when floating");
     assert!(info.start_connection.is_none());
     assert!(info.end_connection.is_none());
 }
@@ -551,16 +579,91 @@ fn slide_background_extraction() {
     // A slide carrying a solid p:bg fill reports it as CSS hex; a layout-
     // inheriting slide reports None.
     let mut pres = Presentation::new();
-    pres.slides.push(
-        Slide::new().with_background(Fill::Solid(Color::Rgb("336699".to_string()))),
-    );
+    pres.slides
+        .push(Slide::new().with_background(Fill::Solid(Color::Rgb("336699".to_string()))));
     pres.slides.push(Slide::new());
 
     assert_eq!(
         slide_background(&pres, 0).expect("solid background"),
         Some("#336699".to_string())
     );
-    assert_eq!(slide_background(&pres, 1).expect("inherited background"), None);
-    assert!(slide_background(&pres, 2).is_err(), "out-of-range slide index");
+    assert_eq!(
+        slide_background(&pres, 1).expect("inherited background"),
+        None
+    );
+    assert!(
+        slide_background(&pres, 2).is_err(),
+        "out-of-range slide index"
+    );
 }
 
+/// Media shapes carry the embedded clip bytes: `ShapeInfo.media` must
+/// roundtrip through the PPTX media parts (`ppt/media/*`) with the
+/// correct kind and MIME type for both video and audio.
+#[test]
+fn media_shape_data_roundtrips() {
+    use base64::Engine as _;
+
+    let clip = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+    let tone = [0x44, 0x49, 0x53, 0x4B, 0x00, 0x02, 0x00, 0x00, 0x11, 0x22];
+    let slide = Slide::new()
+        .with_shape(Shape::Media(SlideMedia::new(
+            7,
+            "clip.mp4".to_string(),
+            clip.to_vec(),
+            MediaFormat::Mp4,
+            914_400,
+            512_000,
+        )))
+        .with_shape(Shape::Media(SlideMedia::new(
+            8,
+            "tone.wav".to_string(),
+            tone.to_vec(),
+            MediaFormat::Wav,
+            457_200,
+            64_000,
+        )));
+
+    let dir = std::env::temp_dir().join("omashow_media");
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    let path = dir.join("media.pptx").to_string_lossy().to_string();
+    save_presentation(&path, &Presentation::new().with_slide(slide)).expect("save deck");
+
+    let reopened = open_pptx_full(&path).expect("deck reopens");
+    let shapes = get_slide_shapes(&reopened, 0).expect("slide shapes");
+    assert_eq!(shapes.len(), 2, "both media shapes survive the roundtrip");
+
+    let video = &shapes[0];
+    assert_eq!(video.kind, "media");
+    let mi = video.media.as_ref().expect("video media info");
+    assert_eq!(mi.media_type, "video");
+    assert_eq!(mi.size_bytes, clip.len());
+    let b64 = mi
+        .data_uri
+        .strip_prefix("data:video/mp4;base64,")
+        .expect("mp4 data URI");
+    assert_eq!(
+        base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .expect("base64"),
+        clip,
+        "video clip must roundtrip byte-for-byte"
+    );
+
+    let audio = &shapes[1];
+    assert_eq!(audio.kind, "media");
+    let ai = audio.media.as_ref().expect("audio media info");
+    assert_eq!(ai.media_type, "audio");
+    assert_eq!(ai.size_bytes, tone.len());
+    let b64 = ai
+        .data_uri
+        .strip_prefix("data:audio/wav;base64,")
+        .expect("wav data URI");
+    assert_eq!(
+        base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .expect("base64"),
+        tone,
+        "audio clip must roundtrip byte-for-byte"
+    );
+}

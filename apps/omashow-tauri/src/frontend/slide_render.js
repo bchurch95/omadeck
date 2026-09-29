@@ -15,7 +15,7 @@ function themeColor(c) {
 }
 
 function renderSlideInto(container, content, mini = false) {
-  container.querySelectorAll(".slide-shape,.slide-pic").forEach((el) => el.remove());
+  container.querySelectorAll(".slide-shape,.slide-pic,.slide-media").forEach((el) => el.remove());
   if (content.background && !NON_SOLID_FILLS.has(content.background)) {
     const bg = themeColor(content.background);
     container.style.backgroundColor = bg;
@@ -27,6 +27,74 @@ function renderSlideInto(container, content, mini = false) {
   const pxPerEmu = w / dims.width_emu;
   const pxPerInch = pxPerEmu * 914400;
   drawShapes(container, content.shapes, pxPerEmu, pxPerInch, mini);
+}
+
+// Embedded media (video/audio) shapes. Video gets a <video> with loop +
+// autoplay and a pause/unmute control bar; audio gets a <audio> with the
+// native controls. Thumbnails render a static glyph instead of a player.
+function drawMediaShape(container, sh, pxPerEmu, mini) {
+  if (!sh.bounds || !sh.media) return;
+  const wrap = document.createElement("div");
+  wrap.className = "slide-media slide-shape";
+  wrap.dataset.shapeId = sh.id;
+  wrap.title = sh.name || (sh.media.media_type === "video" ? "Video" : "Audio");
+  place(wrap, sh.bounds, pxPerEmu);
+
+  if (mini) {
+    const glyph = document.createElement("div");
+    glyph.className = "media-glyph";
+    glyph.textContent = sh.media.media_type === "video" ? "▶" : "♪";
+    wrap.appendChild(glyph);
+    container.appendChild(wrap);
+    return;
+  }
+
+  const el = document.createElement(sh.media.media_type === "video" ? "video" : "audio");
+  el.src = sh.media.data_uri;
+  el.loop = true;
+  el.autoplay = true;
+  el.playsInline = true;
+  el.preload = "auto";
+  // Browsers block unmuted autoplay; start muted and let the user unmute.
+  el.muted = true;
+  if (sh.media.media_type === "audio") el.controls = true;
+  el.addEventListener("canplay", () => { el.play().catch(() => {}); }, { once: true });
+  wrap.appendChild(el);
+
+  const bar = document.createElement("div");
+  bar.className = "media-ctl";
+  const pauseBtn = document.createElement("button");
+  pauseBtn.type = "button";
+  pauseBtn.textContent = "❚❚";
+  pauseBtn.title = "Pause";
+  pauseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.currentTarget.blur();
+    if (el.paused) {
+      el.play().catch(() => {});
+      pauseBtn.textContent = "❚❚";
+      pauseBtn.title = "Pause";
+    } else {
+      el.pause();
+      pauseBtn.textContent = "▶";
+      pauseBtn.title = "Play";
+    }
+  });
+  const muteBtn = document.createElement("button");
+  muteBtn.type = "button";
+  muteBtn.textContent = "🔇";
+  muteBtn.title = "Unmute";
+  muteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.currentTarget.blur();
+    el.muted = !el.muted;
+    muteBtn.textContent = el.muted ? "🔇" : "🔊";
+    muteBtn.title = el.muted ? "Unmute" : "Mute";
+    if (!el.muted) el.play().catch(() => {});
+  });
+  bar.append(pauseBtn, muteBtn);
+  wrap.appendChild(bar);
+  container.appendChild(wrap);
 }
 
 function drawShapes(container, shapes, pxPerEmu, pxPerInch, mini) {
@@ -181,6 +249,10 @@ function drawShapes(container, shapes, pxPerEmu, pxPerInch, mini) {
       line.setAttribute("stroke-width", strokeWidth);
       svg.appendChild(line);
       container.appendChild(svg);
+      continue;
+    }
+    if (sh.kind === "media") {
+      drawMediaShape(container, sh, pxPerEmu, mini);
       continue;
     }
     if (sh.kind !== "autoshape" || !sh.bounds) continue;

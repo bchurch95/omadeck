@@ -137,15 +137,26 @@ events.listen("ink", (e) => {
   }
 });
 
+// A shutter must silence embedded media, not just hide it.
+function setCanvasMediaPaused(paused) {
+  canvas.querySelectorAll(".slide-media video,.slide-media audio").forEach((el) => {
+    if (paused) el.pause();
+    else el.play().catch(() => {});
+  });
+}
+
 if (events) {
   events.listen("shutter", (e) => {
     const mode = e.payload && e.payload.mode;
+    const engaged = mode === "black" || mode === "white";
     canvas.classList.toggle("blackout", mode === "black");
     canvas.classList.toggle("whiteout", mode === "white");
+    setCanvasMediaPaused(engaged);
   });
 
   events.listen("blackout-toggle", (e) => {
     canvas.classList.toggle("blackout", !!e.payload.on);
+    setCanvasMediaPaused(!!e.payload.on);
   });
 
   events.listen("present-exit", () => {

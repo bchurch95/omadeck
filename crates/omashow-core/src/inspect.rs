@@ -8,16 +8,14 @@
 use base64::Engine as _;
 use serde::Serialize;
 
-use office_toolkit::drawing::{
-    Color, Fill, Line, TextAlign, TextBody, TextRun, TextRunProperties,
-};
+use office_toolkit::drawing::{Color, Fill, Line, TextAlign, TextBody, TextRun, TextRunProperties};
 use office_toolkit::powerpoint::{
-    EMU_PER_INCH, PlaceholderKind, Picture, PictureFormat, Presentation, Shape, ShapeGroup,
-    SlideTable,
+    MediaFormat, Picture, PictureFormat, PlaceholderKind, Presentation, Shape, ShapeGroup,
+    SlideMedia, SlideTable, EMU_PER_INCH,
 };
 
 use crate::error::Error;
-use crate::layout_geom::{xml_token, PhMap, PhKey};
+use crate::layout_geom::{xml_token, PhKey, PhMap};
 use crate::model::text_body_to_string;
 
 /// Slide canvas size in EMUs (`<p:sldSz cx=".." cy="..">`).
@@ -112,6 +110,19 @@ pub struct PicInfo {
     pub size_bytes: usize,
 }
 
+/// Embedded audio/video clip data of a media shape, resolved from the deck's
+/// media parts (`ppt/media/*`) through the shape's media relationship.
+#[derive(Debug, Clone, Serialize)]
+pub struct MediaInfo {
+    /// Clip kind: "video" or "audio".
+    pub media_type: &'static str,
+    /// The raw clip bytes as a `data:` URI, ready for an `<video src>` /
+    /// `<audio src>`.
+    pub data_uri: String,
+    /// Size of the raw clip in bytes.
+    pub size_bytes: usize,
+}
+
 /// One cell inside an OpenXML table.
 #[derive(Debug, Clone, Serialize)]
 pub struct TableCellInfo {
@@ -199,6 +210,9 @@ pub struct ShapeInfo {
     /// Embedded image data, only for a `picture` shape.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pic: Option<PicInfo>,
+    /// Embedded audio/video clip, only for a `media` shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media: Option<MediaInfo>,
     /// Extracted table content and grid structure, only for a `table` shape.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table: Option<TableInfo>,
@@ -226,10 +240,7 @@ pub fn get_slide_shapes_geom(
     slide: usize,
     geom: Option<&PhMap>,
 ) -> Result<Vec<ShapeInfo>, Error> {
-    let slide = pres
-        .slides
-        .get(slide)
-        .ok_or(Error::OutOfRange(slide))?;
+    let slide = pres.slides.get(slide).ok_or(Error::OutOfRange(slide))?;
     Ok(slide
         .shapes
         .iter()
@@ -334,13 +345,10 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             let placeholder = a.placeholder.as_ref().map(|p| placeholder_token(&p.kind));
             // Placeholder shapes without their own transform inherit position,
             // size, and default text size from the layout/master table.
-            let inherited = a
-                .placeholder
-                .as_ref()
-                .and_then(|p| {
-                    let key: PhKey = (xml_token(&p.kind), p.index.unwrap_or(0));
-                    geom.and_then(|g| g.get(&key))
-                });
+            let inherited = a.placeholder.as_ref().and_then(|p| {
+                let key: PhKey = (xml_token(&p.kind), p.index.unwrap_or(0));
+                geom.and_then(|g| g.get(&key))
+            });
             let bounds = a
                 .properties
                 .transform
@@ -375,6 +383,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                     .map(|tb| flatten_runs(tb, default_size))
                     .unwrap_or_default(),
                 pic: None,
+                media: None,
                 table: None,
                 connector: None,
                 children: None,
@@ -404,6 +413,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                 .map(line_info),
             runs: Vec::new(),
             pic: Some(pic_info(p)),
+            media: None,
             table: None,
             connector: None,
             children: None,
@@ -424,6 +434,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            media: None,
             table: None,
             connector: None,
             children: None,
@@ -452,6 +463,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
                 line: None,
                 runs: Vec::new(),
                 pic: None,
+                media: None,
                 table: None,
                 connector: None,
                 children: Some(children),
@@ -475,6 +487,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: c.properties.line.as_ref().map(line_info),
             runs: Vec::new(),
             pic: None,
+            media: None,
             table: None,
             connector: Some(ConnectorInfo {
                 start_connection: c.start_connection.map(|sc| ConnectionInfo {
@@ -504,6 +517,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            media: None,
             table: Some(table_info(t)),
             connector: None,
             children: None,
@@ -524,6 +538,7 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             line: None,
             runs: Vec::new(),
             pic: None,
+            media: Some(media_info(m)),
             table: None,
             connector: None,
             children: None,
@@ -600,6 +615,24 @@ fn pic_info(p: &Picture) -> PicInfo {
     }
 }
 
+fn media_info(m: &SlideMedia) -> MediaInfo {
+    // `MediaFormat::is_video`/`content_type` are crate-private in the toolkit,
+    // so classify and name the MIME type here from the public variants.
+    let (media_type, mime) = match m.format {
+        MediaFormat::Mp4 => ("video", "video/mp4"),
+        MediaFormat::Wmv => ("video", "video/x-ms-wmv"),
+        MediaFormat::Avi => ("video", "video/avi"),
+        MediaFormat::Mp3 => ("audio", "audio/mpeg"),
+        MediaFormat::Wav => ("audio", "audio/wav"),
+    };
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&m.data);
+    MediaInfo {
+        media_type,
+        data_uri: format!("data:{mime};base64,{b64}"),
+        size_bytes: m.data.len(),
+    }
+}
+
 fn placeholder_token(kind: &PlaceholderKind) -> &'static str {
     match kind {
         PlaceholderKind::Title => "title",
@@ -631,9 +664,19 @@ fn flatten_runs(tb: &TextBody, default_size_100ths_pt: Option<i32>) -> Vec<TextR
                 TextRun::LineBreak { properties } => {
                     ("\n", properties.as_ref().unwrap_or(&default_props))
                 }
-                TextRun::Field { cached_text, properties, .. } => (cached_text.as_str(), properties),
+                TextRun::Field {
+                    cached_text,
+                    properties,
+                    ..
+                } => (cached_text.as_str(), properties),
             };
-            runs.push(run_info(para_idx, alignment.clone(), text, properties, default_size_100ths_pt));
+            runs.push(run_info(
+                para_idx,
+                alignment.clone(),
+                text,
+                properties,
+                default_size_100ths_pt,
+            ));
         }
     }
     runs
@@ -667,9 +710,10 @@ fn alignment_to_css(alignment: TextAlign) -> String {
         TextAlign::Left => "left".to_string(),
         TextAlign::Center => "center".to_string(),
         TextAlign::Right => "right".to_string(),
-        TextAlign::Justified | TextAlign::JustifiedLow | TextAlign::Distributed | TextAlign::ThaiDistributed => {
-            "justify".to_string()
-        }
+        TextAlign::Justified
+        | TextAlign::JustifiedLow
+        | TextAlign::Distributed
+        | TextAlign::ThaiDistributed => "justify".to_string(),
     }
 }
 
@@ -679,9 +723,18 @@ fn color_to_css(color: &Color) -> String {
         Color::Rgb(hex) => format!("#{hex}"),
         Color::RgbPercent { red, green, blue } => {
             let to_byte = |v: i64| (v.clamp(0, 100_000) * 255 + 50_000) / 100_000;
-            format!("#{:02x}{:02x}{:02x}", to_byte(*red), to_byte(*green), to_byte(*blue))
+            format!(
+                "#{:02x}{:02x}{:02x}",
+                to_byte(*red),
+                to_byte(*green),
+                to_byte(*blue)
+            )
         }
-        Color::Hsl { hue_60000ths, saturation_1000ths_percent, luminance_1000ths_percent } => {
+        Color::Hsl {
+            hue_60000ths,
+            saturation_1000ths_percent,
+            luminance_1000ths_percent,
+        } => {
             format!(
                 "hsl({}, {}%, {}%)",
                 hue_60000ths / 60_000,
@@ -723,10 +776,7 @@ mod tests {
 
     #[test]
     fn color_to_css_covers_all_variants() {
-        assert_eq!(
-            color_to_css(&Color::Rgb("1A2B3C".to_string())),
-            "#1A2B3C"
-        );
+        assert_eq!(color_to_css(&Color::Rgb("1A2B3C".to_string())), "#1A2B3C");
         // 100000 = 100% -> 255 -> ff; 0 -> 00.
         assert_eq!(
             color_to_css(&Color::RgbPercent {
