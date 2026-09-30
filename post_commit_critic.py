@@ -28,6 +28,7 @@ CRITIC_MODEL = os.environ.get("CRITIC_MODEL", "qwen-mlx")
 PREVIEW_IMG = os.path.join(PROJECT_DIR, "latest_ui_preview.png")
 CRITIQUE_MD = os.path.join(PROJECT_DIR, "CRITIQUE.md")
 CRITIQUE_LOG = os.path.join(PROJECT_DIR, "critic_history.jsonl")
+CRITIC_BACKLOG_PATH = os.path.join(PROJECT_DIR, "CRITIC_BACKLOG.md")
 LAST_COMMIT_FILE = os.path.join(PROJECT_DIR, ".last_critiqued_commit")
 TODO_PATH = os.path.join(PROJECT_DIR, "TODO.md")
 
@@ -183,37 +184,20 @@ def run_critic_audit(commit_hash, commit_msg, commit_stat, diff, image_path):
 
 
 def inject_actionable_items_into_todo(commit_hash, commit_msg, score, items):
-    if not items or not os.path.exists(TODO_PATH):
+    if not items:
         return
 
     try:
-        with open(TODO_PATH, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        # Find the active milestone (first milestone containing '[ ]')
-        sections = re.split(r"(##\s+Milestone\s+[^\n]+)", content)
-        target_idx = -1
-        for i in range(1, len(sections), 2):
-            if "[ ]" in sections[i + 1]:
-                target_idx = i + 1
-                break
-
-        if target_idx == -1:
-            target_idx = len(sections) - 1
-
-        feedback_block = f"\n\n### 🔍 Architect & Critic Feedback (Commit {commit_hash[:7]} - Score: {score}/10)\n"
+        feedback_block = f"\n### 🔍 Architect & Critic Feedback (Commit {commit_hash[:7]} - Score: {score}/10)\n"
         for item in items:
             feedback_block += f"- [ ] [Critic] {item}\n"
 
-        sections[target_idx] = sections[target_idx].rstrip() + feedback_block + "\n"
-        updated_content = "".join(sections)
+        with open(CRITIC_BACKLOG_PATH, "a", encoding="utf-8") as f:
+            f.write(feedback_block)
 
-        with open(TODO_PATH, "w", encoding="utf-8") as f:
-            f.write(updated_content)
-
-        print(f"[Critic] Injected {len(items)} actionable feedback item(s) into TODO.md")
+        print(f"[Critic] Appended {len(items)} actionable feedback item(s) to CRITIC_BACKLOG.md (TODO.md kept clean)")
     except Exception as e:
-        print(f"[Critic] Failed to update TODO.md: {e}", file=sys.stderr)
+        print(f"[Critic] Failed to update CRITIC_BACKLOG.md: {e}", file=sys.stderr)
 
 
 def write_critique_artifact(commit_hash, commit_msg, critique, image_path):
