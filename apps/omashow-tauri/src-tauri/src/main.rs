@@ -47,6 +47,10 @@ fn main() {
             reorder_slides,
             apply_theme,
             update_text_run,
+            move_shape,
+            delete_shape,
+            set_text_run,
+            save_presentation_edited,
             undo_presentation,
             redo_presentation,
             undo_state,
@@ -325,6 +329,64 @@ fn update_text_run(
     project(doc)
 }
 
+/// Shift the shape `shape_id` on `slide` by `dx_emu`/`dy_emu` EMU.
+#[tauri::command]
+fn move_shape(
+    slide: usize,
+    shape_id: u32,
+    dx_emu: i64,
+    dy_emu: i64,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<String, String> {
+    let mut deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_mut().ok_or("no presentation open")?;
+    doc.move_shape(slide, shape_id, dx_emu, dy_emu).map_err(|e| e.to_string())?;
+    project(doc)
+}
+
+/// Remove the shape `shape_id` from `slide`.
+#[tauri::command]
+fn delete_shape(
+    slide: usize,
+    shape_id: u32,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<String, String> {
+    let mut deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_mut().ok_or("no presentation open")?;
+    doc.delete_shape(slide, shape_id).map_err(|e| e.to_string())?;
+    project(doc)
+}
+
+/// Replace the text of the run at `run_idx` in the shape `shape_id` on `slide`.
+#[tauri::command]
+fn set_text_run(
+    slide: usize,
+    shape_id: u32,
+    run_idx: usize,
+    text: String,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<String, String> {
+    let mut deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_mut().ok_or("no presentation open")?;
+    doc.set_text_run(slide, shape_id, run_idx, &text).map_err(|e| e.to_string())?;
+    project(doc)
+}
+
+/// Save the current (possibly edited) presentation to `path` and return the
+/// fresh model so the frontend can confirm the write.
+#[tauri::command]
+fn save_presentation_edited(
+    path: String,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<String, String> {
+    let mut deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_mut().ok_or("no presentation open")?;
+    doc.save(&path).map_err(|e| e.to_string())?;
+    let model = project(doc)?;
+    deck.path = Some(path.clone());
+    Ok(model)
+}
+
 /// Undoes the most recent edit; returns the updated model.
 #[tauri::command]
 fn undo_presentation(state: State<'_, Mutex<Deck>>) -> Result<String, String> {
@@ -494,7 +556,7 @@ fn open_audience_window(app: tauri::AppHandle, monitor_name: Option<String>) -> 
             .build()
             .map_err(|e| e.to_string())?;
     } else {
-        let preview_w = (size.width as f64 / scale * 0.65).min(960.0).max(480.0);
+        let preview_w = (size.width as f64 / scale * 0.65).clamp(480.0, 960.0);
         let preview_h = (preview_w * 9.0 / 16.0).round();
         builder
             .title("Omashow — Audience Preview")

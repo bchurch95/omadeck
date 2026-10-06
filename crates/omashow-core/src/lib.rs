@@ -245,6 +245,144 @@ pub fn reorder_shape_z_order(
     Ok(changed)
 }
 
+/// Shift a shape's position by `dx`/`dy` EMU (a delta applied on top of the
+/// shape's current offset). Works for every top-level kind that carries a
+/// position: AutoShape/Connector via `transform.offset`, and Picture/Chart/
+/// Group/Table/Media via `offset_emu`. A missing transform or offset is created
+/// so a delta is never silently dropped.
+pub fn move_shape(
+    pres: &mut Presentation,
+    slide: usize,
+    shape_id: u32,
+    dx: i64,
+    dy: i64,
+) -> Result<(), Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
+    let mut moved = false;
+    for shape in slide.shapes.iter_mut() {
+        let is_target = match shape {
+            Shape::AutoShape(a) => a.id == shape_id,
+            Shape::Picture(p) => p.id == shape_id,
+            Shape::Chart(c) => c.id == shape_id,
+            Shape::Group(g) => g.id == shape_id,
+            Shape::Connector(c) => c.id == shape_id,
+            Shape::Table(t) => t.id == shape_id,
+            Shape::Media(m) => m.id == shape_id,
+        };
+        if !is_target {
+            continue;
+        }
+        match shape {
+            Shape::AutoShape(a) => shift_transform_offset(&mut a.properties, dx, dy),
+            Shape::Connector(c) => shift_transform_offset(&mut c.properties, dx, dy),
+            Shape::Picture(p) => shift_offset_emu(&mut p.offset_emu, dx, dy),
+            Shape::Chart(c) => shift_offset_emu(&mut c.offset_emu, dx, dy),
+            Shape::Group(g) => shift_offset_emu(&mut g.offset_emu, dx, dy),
+            Shape::Table(t) => shift_offset_emu(&mut t.offset_emu, dx, dy),
+            Shape::Media(m) => shift_offset_emu(&mut m.offset_emu, dx, dy),
+        }
+        moved = true;
+        break;
+    }
+    if moved {
+        Ok(())
+    } else {
+        Err(Error::ShapeNotFound(shape_id))
+    }
+}
+
+/// Shift an AutoShape/Connector's `transform.offset` by `dx`/`dy` EMU, creating
+/// the transform and offset if they are missing so the delta is never lost.
+fn shift_transform_offset(props: &mut ShapeProperties, dx: i64, dy: i64) {
+    let t = props.transform.get_or_insert_with(Transform2D::new);
+    let o = t.offset.get_or_insert((0, 0));
+    o.0 = o.0.saturating_add(dx);
+    o.1 = o.1.saturating_add(dy);
+}
+
+/// Add `dx`/`dy` to an `offset_emu` pair (used by the picture/chart/group/
+/// table/media shape kinds).
+fn shift_offset_emu(offset: &mut (i64, i64), dx: i64, dy: i64) {
+    offset.0 = offset.0.saturating_add(dx);
+    offset.1 = offset.1.saturating_add(dy);
+}
+
+/// Remove the top-level shape identified by `shape_id` from the slide and
+/// return its display name (used for the UI undo hint). The full shape is
+/// restored on undo via the history snapshot.
+pub fn delete_shape(
+    pres: &mut Presentation,
+    slide: usize,
+    shape_id: u32,
+) -> Result<String, Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
+    let idx = slide
+        .shapes
+        .iter()
+        .position(|s| match s {
+            Shape::AutoShape(a) => a.id == shape_id,
+            Shape::Picture(p) => p.id == shape_id,
+            Shape::Chart(c) => c.id == shape_id,
+            Shape::Group(g) => g.id == shape_id,
+            Shape::Connector(c) => c.id == shape_id,
+            Shape::Table(t) => t.id == shape_id,
+            Shape::Media(m) => m.id == shape_id,
+        })
+        .ok_or(Error::ShapeNotFound(shape_id))?;
+    let shape = slide.shapes.remove(idx);
+    Ok(match shape {
+        Shape::AutoShape(a) => a.name,
+        Shape::Picture(p) => p.name,
+        Shape::Chart(c) => c.name,
+        Shape::Group(g) => g.name,
+        Shape::Connector(c) => c.name,
+        Shape::Table(t) => t.name,
+        Shape::Media(m) => m.name,
+    })
+}
+
+/// Replace the text of a single run at flat index `run_idx` within the shape's
+/// text body, preserving every other run and the shape's formatting. Runs are
+/// counted in document order across all paragraphs. A `Regular` run gets its
+/// `text` replaced; a `Field` run gets its `cached_text` replaced; a
+/// `LineBreak` at that index is an error because it carries no text.
+pub fn set_text_run(
+    pres: &mut Presentation,
+    slide: usize,
+    shape_id: u32,
+    run_idx: usize,
+    text: &str,
+) -> Result<(), Error> {
+    let slide = pres.slides.get_mut(slide).ok_or(Error::OutOfRange(slide))?;
+    let target =
+        find_autoshape(&mut slide.shapes, shape_id).ok_or(Error::ShapeNotFound(shape_id))?;
+    let body = match target.text_body.as_mut() {
+        Some(b) => b,
+        None => return Err(Error::ShapeNotFound(shape_id)),
+    };
+    let mut seen = 0usize;
+    for para in body.paragraphs.iter_mut() {
+        for run in para.runs.iter_mut() {
+            if seen != run_idx {
+                seen += 1;
+                continue;
+            }
+            return match run {
+                TextRun::Regular { text: run_text, .. } => {
+                    *run_text = text.to_string();
+                    Ok(())
+                }
+                TextRun::Field { cached_text, .. } => {
+                    *cached_text = text.to_string();
+                    Ok(())
+                }
+                TextRun::LineBreak { .. } => Err(Error::OutOfRange(run_idx)),
+            };
+        }
+    }
+    Err(Error::OutOfRange(run_idx))
+}
+
 /// Replace the text of the shape identified by `shape_id` on `slide`.
 /// Searches top-level shapes and one level into groups. The replacement text
 /// is laid out as one paragraph per line and inherits the shape's original

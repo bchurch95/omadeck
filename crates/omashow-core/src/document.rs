@@ -331,6 +331,75 @@ impl PptxDocument {
         Ok(())
     }
 
+    /// Shift a shape's position by `dx`/`dy` EMU (undoable).
+    pub fn move_shape(
+        &mut self,
+        slide: usize,
+        shape_id: u32,
+        dx: i64,
+        dy: i64,
+    ) -> Result<(), Error> {
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
+            .ok_or(Error::OutOfRange(slide))?;
+        crate::move_shape(&mut self.pres, slide, shape_id, dx, dy)?;
+        self.history.record(UndoCommand::Shapes {
+            slide,
+            before,
+            after: self.pres.slides[slide].shapes.clone(),
+            description: format!("move shape {}", shape_id),
+        });
+        self.dirty = true;
+        Ok(())
+    }
+
+    /// Remove a shape from a slide (undoable); returns the removed shape's name.
+    pub fn delete_shape(&mut self, slide: usize, shape_id: u32) -> Result<String, Error> {
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
+            .ok_or(Error::OutOfRange(slide))?;
+        let name = crate::delete_shape(&mut self.pres, slide, shape_id)?;
+        self.history.record(UndoCommand::Shapes {
+            slide,
+            before,
+            after: self.pres.slides[slide].shapes.clone(),
+            description: format!("delete shape {}", shape_id),
+        });
+        self.dirty = true;
+        Ok(name)
+    }
+
+    /// Replace the text of a single run within a shape (undoable).
+    pub fn set_text_run(
+        &mut self,
+        slide: usize,
+        shape_id: u32,
+        run_idx: usize,
+        text: &str,
+    ) -> Result<(), Error> {
+        let before = self
+            .pres
+            .slides
+            .get(slide)
+            .map(|s| s.shapes.clone())
+            .ok_or(Error::OutOfRange(slide))?;
+        crate::set_text_run(&mut self.pres, slide, shape_id, run_idx, text)?;
+        self.history.record(UndoCommand::Shapes {
+            slide,
+            before,
+            after: self.pres.slides[slide].shapes.clone(),
+            description: format!("set text run {}", shape_id),
+        });
+        self.dirty = true;
+        Ok(())
+    }
+
     /// Reorder a shape's z-order (bring to front / send to back / bring
     /// forward / send backward). Snapshot before and after for undo.
     /// Reorders a shape's z-order on a slide, recording a single undo
