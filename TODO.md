@@ -61,7 +61,7 @@
   - Multi-column thumbnail grid with section headers and collapsible dividers (e.g. `OPENING (1-3)`, `FILE NAMING (4-7)`).
   - Drag-and-drop batch slide reordering across sections.
   - Global Theme Engine: instant live recoloring of all slides across the entire deck via design tokens (as shown in `04_sorter_green_theme.png` → `05_sorter_blue_theme.png`).
-- [ ] Floating Stage Tools & Filmstrip Polish (`EDIT`):
+- [x] Floating Stage Tools & Filmstrip Polish (`EDIT`):
   - Floating stage tool pill with `Pen`, `Freehand`, `Nodes` vector pen, and `Snap to guides` toggle button.
   - Filmstrip section headers with slide counts and action badges (✨ AI / ✏️ Edit title).
 - [ ] Animation Engine & Timeline (`ANIMATE`):
@@ -70,13 +70,8 @@
   - Morph slide transitions: automatically detect matching shape names/IDs across consecutive slides and interpolate position, scale, and opacity smoothly.
 
 ### 🔍 Architect & Critic Feedback (Commit 095fe3c - Score: 7/10)
-- [ ] [Critic] Replace .unwrap()/.expect() calls in inspect.rs media-relationship resolution with typed Result<_, Error::MediaRelationMissing> returns and add a unit test for a <p:media> node with a dangling rId.
-- [ ] [Critic] Restore the Z-Order task spec by moving it to a separate file (e.g., TASKS/z-order.md) instead of overwriting CURRENT_TASK.md, preserving the design notes for Milestone 10.
-- [ ] [Critic] Add a try/catch or .catch() guard around media element creation in slide_render.js so a corrupt or missing media blob does not abort the entire slide render loop.
-- [ ] [Critic] In audience.js, add a cleanup hook on slide-advance that calls .pause() and .remove() on all active <audio>/<video> elements to prevent orphaned DOM nodes and audio bleed-through.
-- [ ] [Critic] Override default browser <video> controls with custom dark-slate-styled controls (play/pause, progress, mute) in both index.html and audience.html to maintain native desktop visual consistency.
-- [ ] [Critic] Add a visual regression snapshot test (or manual checklist item) verifying that media shape thumbnails in the editor display a recognizable media-type icon overlay distinct from picture shapes.
-- [ ] [Critic] Verify in inspect.rs that unknown child elements and namespaces within <p:media>/<p:audio> are serialized back verbatim during OOXML roundtrip; add a roundtrip test with a deliberately unknown namespace child.
+
+### 🔍 Architect & Critic Feedback (Commit e413710 - Score: 4/10)
 
 ## Milestone 9: Rich Media, Audio/Video & Tables
 - [x] Embedded Audio & Video Playback: Play slide media parts (`ppt/media/*.mp4`, `.wav`) with auto-play on slide entry, looping, and pause controls. (`inspect.rs` `MediaInfo { media_type, data_uri, size_bytes }` on `ShapeInfo.media`; shared `drawMediaShape()` in slide_render.js renders a positioned, looping, muted-autoplay `<video>` with pause/unmute control bar or a native-controls `<audio>`, with ▶/♪ glyph thumbnails in filmstrip/sorter/next-preview. Wired into editor canvas, presenter console, and audience window.)

@@ -1,20 +1,21 @@
-# CURRENT TASK: Embedded Audio & Video Playback (Milestone 9)
+# CURRENT TASK: Floating Stage Tools & Filmstrip Polish (`EDIT`) (Milestone 8)
 
 ## Goal
-Support playing slide media parts (ppt/media/*.mp4, .wav, .mp3) with auto-play on slide entry, looping, and pause controls in both the editor canvas and presenter console.
+Implement the floating stage tools pill on the editor slide canvas (`Pen`, `Freehand`, `Nodes` vector pen, and `Snap to guides` toggle) and add section headers with slide counts and action badges to the filmstrip.
 
 ## Context
-- Milestone 10 is now 100% COMPLETE!
-- Shape::Media(m) exists in office_toolkit::powerpoint.
-- inspect.rs already has a Shape::Media(m) arm returning kind "media".
+- The HTML/CSS structure for `#stage-tools` and `.fs-section` is already staged in `apps/omashow-tauri/src/frontend/index.html`.
+- `#stage-ink` SVG overlay is already placed on `#slide-canvas`.
 
 ## Steps
-1. In crates/omashow-core/src/inspect.rs:
-   - Add MediaInfo struct with media_type ("video" or "audio") and data_uri.
-   - Attach media: Option<MediaInfo> to ShapeInfo.
-2. In apps/omashow-tauri/src/frontend/slide_render.js:
-   - When sh.kind === "media", render a positioned <video> or <audio> element.
-3. Tests & Verification:
-   - Run cargo test -p omashow-core.
-   - Mark [x] Embedded Audio & Video Playback in TODO.md.
-   - Commit: feat(media): add audio/video playback support
+1. In `apps/omashow-tauri/src/frontend/main.js`:
+   - Wire up the stage tool pill buttons (`#pen-mode-seg button`, `#snap-toggle`, `#stage-ink-undo`, `#stage-ink-clear`):
+     - `pen`: fine opaque freehand vector strokes.
+     - `freehand`: translucent highlighter strokes.
+     - `nodes`: click to place connected vector nodes, drag nodes to reshape.
+     - `snap`: snap coordinates to slide center and third guides.
+   - Render filmstrip section dividers with slide count badges (`.fs-section`, `.fs-section-name`, `.fs-section-range`) and slide action badges (✨ AI / ✏️ Edit title).
+2. Verification:
+   - Check `cargo test -p omashow-core` and run `cargo check -p omashow-tauri`.
+   - Update `TODO.md` to mark `- [x] Floating Stage Tools & Filmstrip Polish (\`EDIT\`)`.
+   - Commit: `feat(editor): add floating stage tool pill and filmstrip section headers`

@@ -682,13 +682,69 @@ function paintCurrentSlide() {
 
 // ---------- filmstrip ----------
 let dragFrom = -1;
+
+// Session-local "AI generated" marks keyed by slide index (never persisted).
+// The remap helpers keep them attached to their slides across structural ops.
+let aiSlides = new Set();
+function remapAiSlides(order) {
+  if (!aiSlides.size) return;
+  aiSlides = new Set(
+    Array.from(aiSlides).map((k) => order.indexOf(k)).filter((k) => k >= 0)
+  );
+}
+function moveAiSlide(from, to) {
+  const n = model.slides.length;
+  const order = Array.from({ length: n }, (_, k) => k);
+  order.splice(from, 1);
+  order.splice(to, 0, from);
+  remapAiSlides(order);
+}
+function deleteAiSlide(i) {
+  if (!aiSlides.size) return;
+  aiSlides = new Set(
+    Array.from(aiSlides).filter((k) => k !== i).map((k) => (k > i ? k - 1 : k))
+  );
+}
+function insertAiSlide(i) {
+  if (!aiSlides.size) return;
+  aiSlides = new Set(Array.from(aiSlides).map((k) => (k >= i ? k + 1 : k)));
+}
+
+// Filmstrip section dividers reuse the sorter's session-local partition; if
+// the partition is missing or stale, fall back to one "All slides" section.
+function filmstripSections() {
+  const n = model.slides.length;
+  const total = sorterSections.reduce((a, s) => a + s.count, 0);
+  if (sorterSections.length && total === n) return sorterSections;
+  return [{ name: "All slides", count: n }];
+}
+
 function renderFilmstrip() {
   const list = $("slides");
   list.innerHTML = "";
   if (!model) return;
-  model.slides.forEach((s, i) => {
-    const item = document.createElement("div");
-    item.className = "slide-item" + (i === currentSlide ? " active" : "");
+  let pos = 0;
+  for (const sec of filmstripSections()) {
+    const header = document.createElement("div");
+    header.className = "fs-section";
+    const name = document.createElement("span");
+    name.className = "fs-section-name";
+    name.textContent = sec.name;
+    const range = document.createElement("span");
+    range.className = "fs-section-range";
+    range.textContent = sec.count ? pos + 1 + "\u2013" + (pos + sec.count) : "(empty)";
+    header.append(name, range);
+    list.appendChild(header);
+    for (let i = pos; i < pos + sec.count; i++) list.appendChild(buildSlideItem(i));
+    pos += sec.count;
+  }
+  renderNavigator();
+}
+
+function buildSlideItem(i) {
+  const s = model.slides[i];
+  const item = document.createElement("div");
+  item.className = "slide-item" + (i === currentSlide ? " active" : "");
 
     const thumb = document.createElement("div");
     thumb.className = "slide-thumb";
@@ -702,6 +758,8 @@ function renderFilmstrip() {
       invoke("delete_slide", { slide: i })
         .then((m) => {
           model = JSON.parse(m);
+          deleteAiSlide(i);
+          stageInkDeleteSlide(i);
           currentSlide = Math.min(currentSlide, model.slides.length - 1);
           renderFilmstrip();
           refreshThumbs();
@@ -742,7 +800,33 @@ function renderFilmstrip() {
     input.addEventListener("input", commit);
     input.addEventListener("blur", () => commit());
 
-    cap.append(idx, input);
+    const badges = document.createElement("span");
+    badges.className = "slide-badges";
+
+    const aiBtn = document.createElement("button");
+    aiBtn.className = "slide-badge ai" + (aiSlides.has(i) ? " on" : "");
+    aiBtn.textContent = "\u2728";
+    aiBtn.title = aiSlides.has(i) ? "AI mark on — click to remove" : "Mark slide as AI-generated";
+    aiBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (aiSlides.has(i)) aiSlides.delete(i);
+      else aiSlides.add(i);
+      aiBtn.classList.toggle("on", aiSlides.has(i));
+      aiBtn.title = aiSlides.has(i) ? "AI mark on — click to remove" : "Mark slide as AI-generated";
+    });
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "slide-badge edit";
+    editBtn.textContent = "\u270e";
+    editBtn.title = "Edit title";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      input.focus();
+      input.select();
+    });
+
+    badges.append(aiBtn, editBtn);
+    cap.append(idx, input, badges);
     item.append(thumb, cap);
     item.addEventListener("click", () => selectSlide(i));
 
@@ -757,7 +841,7 @@ function renderFilmstrip() {
     item.addEventListener("dragend", () => {
       dragFrom = -1;
       item.classList.remove("dragging");
-      list.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+      document.querySelectorAll("#slides .drag-over").forEach((el) => el.classList.remove("drag-over"));
     });
     item.addEventListener("dragover", (e) => {
       if (dragFrom < 0 || dragFrom === i) return;
@@ -777,6 +861,8 @@ function renderFilmstrip() {
         .then((m) => {
           if (follow) currentSlide = i;
           model = JSON.parse(m);
+          moveAiSlide(from, i);
+          stageInkMoveSlide(from, i);
           renderFilmstrip();
           refreshThumbs();
           paintCurrentSlide();
@@ -787,12 +873,9 @@ function renderFilmstrip() {
         })
         .catch((err) => flash(String(err), "err"));
     });
-    list.appendChild(item);
-
     const cached = slideContents.get(i);
     if (cached) renderSlideInto(thumb, cached, true);
-  });
-  renderNavigator();
+    return item;
 }
 
 // ---------- selection ----------
@@ -828,6 +911,7 @@ function selectSlide(i) {
   updatePreview();
   updateConsole();
   renderInkForCurrent();
+  stageInkOnSlideChanged();
   emitToAudience("slide-changed", { index: i, ink: inkBySlide.get(i) || [] });
 }
 
@@ -847,6 +931,7 @@ function applyModel(data, selectLast = false) {
   hasDeck();
   refreshUndoUI();
   resetInk();
+  stageInkOnModelLoaded();
 }
 
 // ---------- actions ----------
@@ -1075,6 +1160,8 @@ function sorterReorderTo(order) {
   invoke("reorder_slides", { order })
     .then((m) => {
       model = JSON.parse(m);
+      remapAiSlides(order);
+      stageInkReorder(order);
       sorterSel = new Set(selBefore.map((k) => order.indexOf(k)));
       sorterReconcileSections(order, selBefore);
       slideContents.clear();
@@ -1348,6 +1435,8 @@ const addSlide = () => {
   invoke("add_slide_at", { index: idx, title: null })
     .then((m) => {
       applyModel(m);
+      insertAiSlide(idx);
+      stageInkInsertSlide(idx);
       currentSlide = idx;
       renderFilmstrip();
       markState("edited");
@@ -1707,3 +1796,6 @@ invoke("initial_deck_path").then((p) => {
 }).catch(() => {});
 
 hasDeck();
+
+// Editor-only floating stage tools (pen / ink / undo / clear).
+initStageTools();

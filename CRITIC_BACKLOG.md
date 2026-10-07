@@ -156,3 +156,27 @@
 - [ ] [Critic] Add a build-time codegen step (build.rs or a small Rust proc-macro) to translate Icons.qml into SVG/PNG assets consumable by the Tauri/HTML5 frontend
 - [ ] [Critic] Break the meta-cycle: halt critic-recording commits until at least one production Rust module or UI component lands in the next 3 commits
 - [ ] [Critic] Add a 'pipeline_health' field to critic_history.jsonl schema and validate it with a JSON Schema or serde deserialization guard
+- [ ] [Critic] Replace .unwrap()/.expect() calls in inspect.rs media-relationship resolution with typed Result<_, Error::MediaRelationMissing> returns and add a unit test for a <p:media> node with a dangling rId.
+- [ ] [Critic] Restore the Z-Order task spec by moving it to a separate file (e.g., TASKS/z-order.md) instead of overwriting CURRENT_TASK.md, preserving the design notes for Milestone 10.
+- [ ] [Critic] Add a try/catch or .catch() guard around media element creation in slide_render.js so a corrupt or missing media blob does not abort the entire slide render loop.
+- [ ] [Critic] In audience.js, add a cleanup hook on slide-advance that calls .pause() and .remove() on all active <audio>/<video> elements to prevent orphaned DOM nodes and audio bleed-through.
+- [ ] [Critic] Override default browser <video> controls with custom dark-slate-styled controls (play/pause, progress, mute) in both index.html and audience.html to maintain native desktop visual consistency.
+- [ ] [Critic] Add a visual regression snapshot test (or manual checklist item) verifying that media shape thumbnails in the editor display a recognizable media-type icon overlay distinct from picture shapes.
+- [ ] [Critic] Verify in inspect.rs that unknown child elements and namespaces within <p:media>/<p:audio> are serialized back verbatim during OOXML roundtrip; add a roundtrip test with a deliberately unknown namespace child.
+- [ ] [Critic] Amend or re-commit e413710d with a 'docs:' or 'chore:' prefix to accurately reflect that this is a TODO.md tracking update, not a feature implementation.
+- [ ] [Critic] Verify that the actual media playback code (inspect.rs MediaInfo, slide_render.js drawMediaShape, audience.js integration) exists in a prior commit and add a cross-reference link in the TODO entry.
+- [ ] [Critic] Implement the try/catch guard around media element creation in slide_render.js so a corrupt or missing media blob does not abort the entire slide render loop.
+- [ ] [Critic] Add a slide-advance cleanup hook in audience.js that calls .pause() and .remove() on all active <audio>/<video> elements to prevent orphaned DOM nodes and audio bleed-through.
+- [ ] [Critic] Replace native browser <video>/<audio> controls with a custom dark-slate-styled control bar (play/pause, progress, mute) in both index.html and audience.html for visual consistency.
+- [ ] [Critic] Add a Rust unit test in inspect.rs that feeds a <p:media> node with a dangling rId and asserts a typed Result::Err(Error::MediaRelationMissing) rather than a panic.
+- [ ] [Critic] Add a Rust roundtrip test that injects an unknown-namespaced child element inside <p:media> and asserts it is serialized back verbatim in the output .pptx.
+- [ ] [Critic] Add a visual regression snapshot (or manual checklist entry) verifying that media shape thumbnails display a recognizable media-type icon overlay distinct from picture shapes in the editor, sorter, and next-preview panels.
+
+### 🔍 Architect & Critic Feedback (Commit 7d89530 - Score: 7/10)
+- [ ] [Critic] Replace map_err(|e| e.to_string()) in all new Tauri commands with a typed error enum that implements Serialize, so the frontend can branch on error kind (OutOfRange, IO, LockPoisoned).
+- [ ] [Critic] Optimize move_shape undo recording: store a delta (shape_id, old_x, old_y) instead of cloning the entire shapes Vec, reducing per-frame allocation during interactive drags.
+- [ ] [Critic] Add off-canvas bounds validation (or a soft clamp) in move_shape so shapes cannot be silently moved outside the slide's EMU coordinate space.
+- [ ] [Critic] Reorder save_presentation_edited to call project(doc) before doc.save(&path), or wrap both in a transactional guard, to prevent in-memory/disk divergence on partial failure.
+- [ ] [Critic] Remove the unnecessary .clone() on path in save_presentation_edited (deck.path = Some(path)).
+- [ ] [Critic] Add a follow-up frontend commit wiring move_shape to a drag-handle interaction, delete_shape to a Delete/Backspace keybinding, and set_text_run to an inline contentEditable overlay on the slide canvas.
+- [ ] [Critic] Add unit tests in omashow-core for move_shape, delete_shape, and set_text_run covering: valid indices, out-of-range indices, undo/redo round-trip, and XML node preservation (assert unknown child elements survive the edit).

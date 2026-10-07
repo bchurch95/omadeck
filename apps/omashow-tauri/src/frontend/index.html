@@ -142,6 +142,69 @@
     .slide-item.active { border-color: var(--accent); background: #202940; }
     .slide-item.dragging { opacity: 0.4; }
     .slide-item.drag-over { border-color: var(--accent-2); background: #252c4d; }
+    /* ---------- filmstrip section headers + per-slide badges ---------- */
+    .fs-section {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin: 12px 2px 4px;
+      padding: 4px 8px;
+      border-left: 2px solid var(--accent);
+      background: rgba(122, 162, 247, 0.07);
+      border-radius: 4px;
+      user-select: none;
+    }
+    .fs-section:first-child { margin-top: 2px; }
+    .fs-section-name {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #cfe0ff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+    .fs-section-range {
+      margin-left: auto;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .slide-badges {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .slide-badge {
+      font-size: 9.5px;
+      line-height: 1;
+      padding: 2px 5px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: #222a41;
+      color: var(--muted);
+      cursor: default;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+    }
+    .slide-item:hover .slide-badge,
+    .slide-badge:focus-visible,
+    .slide-item.active .slide-badge.ai {
+      opacity: 1;
+    }
+    .slide-badge.ai {
+      border-color: rgba(122, 162, 247, 0.45);
+      background: rgba(122, 162, 247, 0.16);
+      color: #cfe0ff;
+      opacity: 1;
+    }
+    .slide-badge.edit { cursor: pointer; }
+    .slide-badge.edit:hover { background: #2b3552; color: #e2e8f2; }
     .slide-thumb {
       position: relative;
       width: 100%;
@@ -308,6 +371,7 @@
     }
     #preview-wrap {
       flex: 1;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -315,6 +379,92 @@
       min-height: 0;
       background: radial-gradient(1100px 640px at 50% 44%, #202942 0%, #10131a 72%);
     }
+    /* ---------- floating stage tool pill (editor) ---------- */
+    #stage-tools {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      background: rgba(24, 29, 43, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    body[data-mode="edit"] #stage-tools { display: flex; }
+    body[data-mode="edit"] #preview-wrap:hover #stage-tools,
+    body[data-mode="edit"] #stage-tools.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    body.presenting #stage-tools { display: none; }
+    #stage-tools .seg { border: none; }
+    #stage-tools .seg button {
+      padding: 4px 11px;
+      font-size: 12px;
+      border-right: 1px solid var(--border);
+      background: transparent;
+    }
+    #stage-tools .seg button:last-child { border-right: none; }
+    #stage-tools .seg button.on {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0f1117;
+      font-weight: 700;
+    }
+    .pill-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #222a41;
+      color: #e2e8f2;
+      cursor: pointer;
+    }
+    .pill-toggle svg { width: 12px; height: 12px; }
+    .pill-toggle.on { background: rgba(122, 162, 247, 0.18); border-color: var(--accent); color: #cfe0ff; }
+    .pill-sep { width: 1px; align-self: stretch; background: var(--border); }
+    .pill-icon {
+      padding: 4px 8px;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #222a41;
+      color: #e2e8f2;
+      cursor: pointer;
+    }
+    .pill-icon:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+    /* editor vector-ink overlay on the slide canvas */
+    #stage-ink {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 8;
+      pointer-events: none;
+    }
+    #stage-ink.active { pointer-events: auto; cursor: crosshair; }
+    #stage-ink.node-mode { cursor: crosshair; }
+    #stage-ink .node-handle {
+      fill: #0f1117;
+      stroke: #7aa2f7;
+      stroke-width: 2;
+      cursor: move;
+      pointer-events: all;
+    }
+    #stage-ink .node-handle:hover { fill: #7aa2f7; }
     /* ---------- presenter console (visible while presenting) ---------- */
     #present-topbar {
       display: none;
@@ -1263,10 +1413,25 @@
         <div id="slide-canvas">
           <div id="slide-stage"></div>
           <svg id="ink-overlay" viewBox="0 0 12192000 6858000" preserveAspectRatio="none" aria-hidden="true"><g id="ink-strokes"></g></svg>
+          <svg id="stage-ink" viewBox="0 0 12192000 6858000" preserveAspectRatio="none" aria-hidden="true"><g id="stage-ink-strokes"></g></svg>
           <textarea id="text-edit" spellcheck="false"></textarea>
           <div id="empty-msg" class="empty-state">
             Open a .pptx or create a new deck to begin
           </div>
+        </div>
+        <div id="stage-tools" class="stage-tools" role="toolbar" aria-label="Stage pen tools">
+          <div class="seg" id="pen-mode-seg" title="Vector pen mode">
+            <button type="button" data-mode="pen" title="Pen — fine opaque freehand stroke">Pen</button>
+            <button type="button" data-mode="freehand" title="Freehand — thick translucent highlighter">Freehand</button>
+            <button type="button" data-mode="nodes" title="Nodes — click to place connected nodes, double-click or Enter to finish, drag nodes to reshape">Nodes</button>
+          </div>
+          <button type="button" id="snap-toggle" class="pill-toggle" title="Snap points to slide guides (center and thirds)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v14M1 8h14" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.4" fill="currentColor"/></svg>
+            Snap
+          </button>
+          <span class="pill-sep" aria-hidden="true"></span>
+          <button type="button" id="stage-ink-undo" class="pill-icon" title="Undo last stroke" disabled>Undo</button>
+          <button type="button" id="stage-ink-clear" class="pill-icon" title="Clear all strokes on this slide" disabled>Clear</button>
         </div>
       </div>
       <footer id="current-footer">
@@ -1421,6 +1586,7 @@
   </section>
   </div>
   <script src="slide_render.js"></script>
+  <script src="stage_tools.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
