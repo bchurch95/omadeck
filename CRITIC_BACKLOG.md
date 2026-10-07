@@ -180,3 +180,15 @@
 - [ ] [Critic] Remove the unnecessary .clone() on path in save_presentation_edited (deck.path = Some(path)).
 - [ ] [Critic] Add a follow-up frontend commit wiring move_shape to a drag-handle interaction, delete_shape to a Delete/Backspace keybinding, and set_text_run to an inline contentEditable overlay on the slide canvas.
 - [ ] [Critic] Add unit tests in omashow-core for move_shape, delete_shape, and set_text_run covering: valid indices, out-of-range indices, undo/redo round-trip, and XML node preservation (assert unknown child elements survive the edit).
+
+### 🔍 Architect & Critic Feedback (Commit 83043c5 - Score: 6/10)
+- [ ] [Critic] Deduplicate CRITIC_BACKLOG.md: merge the three pairs of repeated entries (media try/catch, slide-advance cleanup, custom video controls) into single items with a 'status: open' tag
+- [ ] [Critic] Add a newline at end of .last_critiqued_commit to eliminate spurious diff noise on every critic cycle
+- [ ] [Critic] Replace .unwrap()/.expect() in inspect.rs media-relationship resolution with Result<_, Error::MediaRelationMissing> and add a unit test for a <p:media> node with a dangling rId
+- [ ] [Critic] Wrap media element creation in slide_render.js with try/catch so a corrupt or missing media blob does not abort the entire slide render loop
+- [ ] [Critic] Add a slide-advance cleanup hook in audience.js that calls .pause() and .remove() on all active <audio>/<video> elements to prevent orphaned DOM nodes and audio bleed-through
+- [ ] [Critic] Move the Z-Order task spec from CURRENT_TASK.md to TASKS/z-order.md to preserve Milestone 10 design notes instead of overwriting them
+- [ ] [Critic] Add a visual regression snapshot (or manual checklist entry) verifying the floating stage-tool pill renders correctly at 1080p and 4K with no icon misalignment or fallback-font artifacts
+- [ ] [Critic] Add a Rust roundtrip test in inspect.rs that injects an unknown-namespaced child inside <p:media> and asserts verbatim serialization in the output .pptx
+- [ ] [Critic] Split the next frontend commit: land stage_tools.js as its own commit, then index.html + main.js integration as a second, to improve git bisectability
+- [ ] [Critic] Override default browser <video>/<audio> controls with a custom dark-slate-styled control bar (play/pause, progress, mute) in both index.html and audience.html

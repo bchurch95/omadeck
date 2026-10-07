@@ -47,7 +47,7 @@ jobs:
           fi
           if [ -d "$BUNDLE_DIR/macos" ]; then
             cd "$BUNDLE_DIR/macos"
-            tar -czf "$GITHUB_WORKSPACE/artifacts/Omashow-macos-app.tar.gz" Omashow.app
+            tar -czf "$GITHUB_WORKSPACE/artifacts/OmaDeck-macos-app.tar.gz" OmaDeck*.app
             cd "$GITHUB_WORKSPACE"
           fi
 
