@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use tauri::{Manager, State, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
-use omashow_core::{model_of, PptxDocument, SlideDimensions, ZOrderAction};
+use omashow_core::{detect_morph, model_of, MorphResult, PptxDocument, SlideDimensions, ZOrderAction};
 use serde::Serialize;
 
 /// The in-memory deck — the single source of truth. `PptxDocument` holds both the
@@ -38,6 +38,7 @@ fn main() {
             export_pdf,
             export_html,
             get_slide_content,
+            morph_between,
             set_title,
             set_notes,
             add_slide,
@@ -172,6 +173,21 @@ fn get_slide_content(slide: usize, state: State<'_, Mutex<Deck>>) -> Result<Slid
         background: bg,
         shapes,
     })
+}
+
+/// Which shapes morph between two slides (Keynote Magic Move detection).
+/// The frontend drives the transition animation from the returned boxes.
+#[tauri::command]
+fn morph_between(
+    before: usize,
+    after: usize,
+    state: State<'_, Mutex<Deck>>,
+) -> Result<MorphResult, String> {
+    let deck = state.lock().map_err(|e| e.to_string())?;
+    let doc = deck.doc.as_ref().ok_or("no presentation open")?;
+    let a = doc.get_slide_shapes(before).map_err(|e| e.to_string())?;
+    let b = doc.get_slide_shapes(after).map_err(|e| e.to_string())?;
+    Ok(detect_morph(&a, &b))
 }
 
 #[tauri::command]

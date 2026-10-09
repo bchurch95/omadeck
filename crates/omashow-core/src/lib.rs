@@ -15,6 +15,7 @@ pub mod inspect;
 pub mod io;
 pub mod layout_geom;
 pub mod model;
+pub mod morph;
 pub mod undo;
 
 pub use document::PptxDocument;
@@ -25,6 +26,7 @@ pub use inspect::{
 };
 pub use layout_geom::{LayoutGeometry, PhGeom, PhMap};
 pub use model::{PresentationModel, SlideModel};
+pub use morph::{detect_morph, MorphBox, MorphMatch, MorphResult};
 pub use office_toolkit::powerpoint::Presentation;
 pub use undo::{UndoCommand, UndoStack};
 
