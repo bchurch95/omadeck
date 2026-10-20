@@ -192,3 +192,18 @@
 - [ ] [Critic] Add a Rust roundtrip test in inspect.rs that injects an unknown-namespaced child inside <p:media> and asserts verbatim serialization in the output .pptx
 - [ ] [Critic] Split the next frontend commit: land stage_tools.js as its own commit, then index.html + main.js integration as a second, to improve git bisectability
 - [ ] [Critic] Override default browser <video>/<audio> controls with a custom dark-slate-styled control bar (play/pause, progress, mute) in both index.html and audience.html
+
+### 🔍 Architect & Critic Feedback (Commit da6e29d - Score: 7/10)
+- [ ] [Critic] Unify the product name: either rename all Cargo.toml packages and tauri.conf.json productName to 'OmaDeck', or revert the CI artifact name back to 'Omashow' — pick one and propagate everywhere in a single commit.
+- [ ] [Critic] Add a trailing newline to .last_critiqued_commit (echo -n is the culprit; use printf '%s\n' or ensure the writer appends \n).
+- [ ] [Critic] Tighten the macOS tar glob in release.yml to 'find . -maxdepth 1 -name "OmaDeck.app" -print0 | tar -czf … --null -T -' to avoid matching .dSYM or duplicate bundles.
+- [ ] [Critic] Deduplicate the three repeated CRITIC_BACKLOG.md entries (media try/catch, slide-advance cleanup, custom video controls) into single items with a 'status: open' tag as the backlog itself recommends.
+- [ ] [Critic] Add a CI visual-regression step (e.g., Playwright screenshot at 1080p and 4K) that gates the release pipeline on the stage-tool pill and toolbar rendering.
+- [ ] [Critic] Address the highest-priority backlog items before 0.1.6: replace .unwrap()/.expect() in inspect.rs media-relationship resolution with a typed Result and add the dangling-rId unit test.
+
+### 🔍 Architect & Critic Feedback (Commit 84d9959 - Score: 7/10)
+- [ ] [Critic] Add unit tests in morph.rs covering all three pairing tiers, the group-as-unit invariant, and the no-bounds exclusion path (use #[cfg(test)] with small fixture ShapeInfo vectors).
+- [ ] [Critic] Replace `.map_err(|e| e.to_string())` in morph_between with a typed MorphError enum (Lock, SlideNotFound, ShapeExtraction) that implements Display and std::error::Error.
+- [ ] [Critic] Clone the shape vectors under the Mutex lock and run detect_morph outside the critical section to avoid blocking the UI thread on large decks.
+- [ ] [Critic] Add a frontend stub (e.g., a morph-preview panel or a console.log of MorphResult) so the Tauri command is exercised end-to-end before the full animation layer lands.
+- [ ] [Critic] Verify the nearest-centroid fallback uses an epsilon tolerance (e.g., 100 EMU ≈ 0.01 mm) when comparing distances to prevent pairing instability from sub-pixel rounding.
