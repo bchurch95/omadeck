@@ -64,7 +64,7 @@
 - [x] Floating Stage Tools & Filmstrip Polish (`EDIT`):
   - Floating stage tool pill with `Pen`, `Freehand`, `Nodes` vector pen, and `Snap to guides` toggle button.
   - Filmstrip section headers with slide counts and action badges (✨ AI / ✏️ Edit title).
-- [ ] Animation Engine & Timeline (`ANIMATE`):
+- [x] Animation Engine & Timeline (`ANIMATE`):
   - Multi-track timeline ruler in seconds (`0.0, 0.5, 1.0, 1.5...`), object duration bars, playhead scrubber, and speed selector (`1x`, `0.5x`, `2x`).
   - Build Inspector with Build In/Out timing (`At time`, `On click`, `With/After previous`), duration, and easing curves.
   - Morph slide transitions: automatically detect matching shape names/IDs across consecutive slides and interpolate position, scale, and opacity smoothly.
