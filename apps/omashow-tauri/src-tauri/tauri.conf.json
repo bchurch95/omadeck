@@ -4,6 +4,8 @@
   "version": "0.1.5",
   "identifier": "dev.omadeck.desktop",
   "build": {
+    "beforeDevCommand": "python3 -m http.server 1420 --directory ../src/frontend",
+    "devUrl": "http://localhost:1420/",
     "frontendDist": "../src/frontend"
   },
   "app": {
@@ -26,6 +28,10 @@
     "targets": "all",
     "icon": [
       "icons/icon.png"
-    ]
+    ],
+    "ios": {
+      "infoPlist": "Info.ios.plist",
+      "minimumSystemVersion": "15.0"
+    }
   }
 }

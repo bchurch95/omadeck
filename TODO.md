@@ -85,7 +85,7 @@
 
 ## Stretch Milestone: iPadOS & AirPlay External Display Support
 - [x] Add touch navigation gestures to slide viewer (swipe left/right to advance, tap to toggle notes).
-- [ ] Configure Tauri v2 iOS/iPadOS mobile target (`cargo tauri ios`).
+- [x] Configure Tauri v2 iOS/iPadOS mobile target (`cargo tauri ios`). (Tauri v2 schema: iOS config lives under `bundle.ios`, not a top-level `mobile` key — `tauri-utils` `Config` uses `deny_unknown_fields` and has no `mobile` field. `bundle.ios.infoPlist` points at `src-tauri/Info.ios.plist` (CFBundleDisplayName, UIRequiresFullScreen, portrait+landscape orientations for iPhone/iPad), `minimumSystemVersion` 15.0. 1024×1024 `icons/icon.png` source for `cargo tauri icon`, `capabilities/mobile.json` for the `mobile` capability. Verified on Linux: `cargo check -p omashow-tauri` + workspace check + core tests pass; `cargo tauri ios init/dev/build` itself requires a macOS+Xcode host.)
 - [ ] Implement secondary display routing for AirPlay / external screens via `UIScreen` / `UIWindowScene` (dedicated audience window, avoiding simple mirroring).
 - [ ] Support Split View / Slide Over multitasking with live AirPlay slide presentation.
 - [ ] Background AirPlay video stream mode allowing complete app minimization while keeping audience slides active.
