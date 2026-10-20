@@ -84,7 +84,7 @@
 - [x] Sidebar Layers Panel: Collapsible layers tree showing all shapes, text boxes, and media on the active slide; support click-to-select, visibility toggle (hide/show eye icon), and layer reordering. (Left-sidebar panel above the filmstrip: z-ordered shape list with kind badges, click-to-select synced with stage highlight, eye-icon visibility toggle persisted per slide and applied to thumbnails, ▲/▼ reorder via `reorder_shape_z_order`, collapse/expand. Lock state, rename, and drag-and-drop remain open.)
 
 ## Stretch Milestone: iPadOS & AirPlay External Display Support
-- [ ] Add touch navigation gestures to slide viewer (swipe left/right to advance, tap to toggle notes).
+- [x] Add touch navigation gestures to slide viewer (swipe left/right to advance, tap to toggle notes).
 - [ ] Configure Tauri v2 iOS/iPadOS mobile target (`cargo tauri ios`).
 - [ ] Implement secondary display routing for AirPlay / external screens via `UIScreen` / `UIWindowScene` (dedicated audience window, avoiding simple mirroring).
 - [ ] Support Split View / Slide Over multitasking with live AirPlay slide presentation.

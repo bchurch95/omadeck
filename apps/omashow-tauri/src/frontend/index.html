@@ -818,11 +818,15 @@
         0 6px 28px rgba(122,162,247,0.10);
       position: relative;
       overflow: hidden;
+      /* let JS own all finger gestures on the slide (swipe nav, taps) */
+      touch-action: none;
     }
     #slide-stage { position: absolute; inset: 0; }
     #text-edit {
       position: absolute;
       display: none;
+      /* editable content keeps its native touch handling inside the canvas */
+      touch-action: auto;
       z-index: 20;
       margin: 0;
       padding: 4px 6px;

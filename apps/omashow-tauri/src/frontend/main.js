@@ -608,6 +608,92 @@ $("slide-canvas").addEventListener("click", () => {
   else exitPresent();
 });
 
+// --- touch gestures: swipe left/right navigates, double-tap or two-finger
+// --- tap toggles the speaker notes bar. Skipped while ink tools, stage
+// --- tools, or text editing are active so those keep their pointer input.
+const touchNav = { state: null, lastTapAt: 0, lastTapX: 0, lastTapY: 0 };
+const SWIPE_MIN_PX = 50, TAP_SLOP_PX = 12, TAP_MAX_MS = 350,
+      DBL_TAP_MS = 300, DBL_TAP_RADIUS_PX = 40,
+      TWO_FINGER_TAP_MS = 400, TWO_FINGER_TAP_SLOP_PX = 25;
+function touchGestureBlocked(e) {
+  if (presenting() || inkTool || drawing || textEditCtx) return true;
+  if (typeof stageInk !== "undefined" && stageInk.tool) return true;
+  if (e && e.target && e.target.closest("#text-edit, #stage-tools, button, input, textarea, select, a")) return true;
+  return false;
+}
+function touchCentroid(touches) {
+  let x = 0, y = 0;
+  for (const t of touches) { x += t.clientX; y += t.clientY; }
+  return { x: x / touches.length, y: y / touches.length };
+}
+$("slide-canvas").addEventListener("touchstart", (e) => {
+  if (touchGestureBlocked(e)) { touchNav.state = null; return; }
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    touchNav.state = { mode: "single", sx: t.clientX, sy: t.clientY, t0: performance.now() };
+  } else {
+    const c = touchCentroid(e.touches);
+    touchNav.state = { mode: "multi", cx: c.x, cy: c.y, t0: performance.now(), maxMove: 0 };
+  }
+}, { passive: true });
+$("slide-canvas").addEventListener("touchmove", (e) => {
+  const st = touchNav.state;
+  if (!st || e.touches.length === 0) return;
+  if (st.mode === "single" && e.touches.length > 1) {
+    // second finger landed: this is no longer a swipe
+    const c = touchCentroid(e.touches);
+    touchNav.state = { mode: "multi", cx: c.x, cy: c.y, t0: performance.now(), maxMove: 0 };
+    return;
+  }
+  if (st.mode === "single") {
+    st.dx = e.touches[0].clientX - st.sx;
+    st.dy = e.touches[0].clientY - st.sy;
+  } else {
+    const c = touchCentroid(e.touches);
+    st.maxMove = Math.max(st.maxMove, Math.hypot(c.x - st.cx, c.y - st.cy));
+  }
+}, { passive: true });
+$("slide-canvas").addEventListener("touchend", (e) => {
+  const st = touchNav.state;
+  if (!st) return;
+  if (e.touches.length > 0) return; // fingers still down; decide on the last lift
+  touchNav.state = null;
+  const t = e.changedTouches[0];
+  const dur = performance.now() - st.t0;
+  if (st.mode === "single") {
+    const dx = t.clientX - st.sx, dy = t.clientY - st.sy;
+    if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy)) {
+      if (model && model.slides.length > 0) {
+        if (dx < 0 && currentSlide < model.slides.length - 1) selectSlide(currentSlide + 1);
+        else if (dx > 0 && currentSlide > 0) selectSlide(currentSlide - 1);
+      }
+      touchNav.lastTapAt = 0;
+      e.preventDefault(); // swallow the synthetic click so a shape isn't selected
+      return;
+    }
+    if (Math.abs(dx) <= TAP_SLOP_PX && Math.abs(dy) <= TAP_SLOP_PX && dur < TAP_MAX_MS) {
+      const now = performance.now();
+      if (now - touchNav.lastTapAt < DBL_TAP_MS &&
+          Math.hypot(t.clientX - touchNav.lastTapX, t.clientY - touchNav.lastTapY) <= DBL_TAP_RADIUS_PX) {
+        touchNav.lastTapAt = 0;
+        $("notes-bar").classList.toggle("collapsed");
+        e.preventDefault(); // swallow synthetic click + dblclick (text editor)
+        return;
+      }
+      touchNav.lastTapAt = now;
+      touchNav.lastTapX = t.clientX;
+      touchNav.lastTapY = t.clientY;
+    }
+    return; // plain tap: let the synthetic click do shape selection
+  }
+  if (dur < TWO_FINGER_TAP_MS && st.maxMove <= TWO_FINGER_TAP_SLOP_PX) {
+    touchNav.lastTapAt = 0;
+    $("notes-bar").classList.toggle("collapsed");
+    e.preventDefault();
+  }
+});
+$("slide-canvas").addEventListener("touchcancel", () => { touchNav.state = null; });
+
 function fetchSlideContent(i, force = false) {
   if (!model || i < 0 || i >= model.slides.length) return;
   if (!force && slideContents.has(i)) return;
