@@ -1138,9 +1138,196 @@
     .export-card p { margin: 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; flex: 1; }
     .export-card .primary { align-self: flex-start; }
     body[data-mode="export"] #export-panel { display: flex; }
+    body[data-mode="animate"] #animate-panel { display: flex; }
     body[data-mode="design"] #placeholder-panel,
-    body[data-mode="animate"] #placeholder-panel,
     body[data-mode="review"] #placeholder-panel { display: flex; }
+    /* ---------- animate: build effects & timeline ---------- */
+    #animate-panel {
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 0;
+      padding: 0;
+    }
+    #animate-subbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    #animate-subbar label {
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    #anim-target { max-width: 180px; }
+    #anim-add-out {
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #anim-add-out:hover { border-color: var(--accent); }
+    #anim-remove {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #anim-remove:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+    #anim-remove:disabled { opacity: 0.4; cursor: default; }
+    #anim-play { display: inline-flex; align-items: center; gap: 7px; }
+    #anim-play svg { width: 12px; height: 12px; }
+    #anim-play.playing { background: var(--danger); border-color: var(--danger); }
+    #timeline {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 14px 14px 8px;
+      overflow: auto;
+      min-height: 0;
+    }
+    #timeline-ruler {
+      position: relative;
+      height: 24px;
+      margin-left: 150px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .tl-tick { position: absolute; bottom: 0; width: 1px; height: 6px; background: var(--border); }
+    .tl-tick-lbl { position: absolute; bottom: 8px; font-size: 10px; color: var(--dim); transform: translateX(4px); }
+    #timeline-body { position: relative; }
+    .tl-lane {
+      position: relative;
+      height: 30px;
+      margin-left: 150px;
+      border-bottom: 1px dashed rgba(154, 163, 184, 0.15);
+    }
+    .tl-lane-label {
+      position: absolute;
+      left: -150px;
+      width: 142px;
+      top: 0;
+      height: 30px;
+      line-height: 30px;
+      font-size: 11.5px;
+      color: #c6cddb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-right: 8px;
+    }
+    .tl-bar {
+      position: absolute;
+      top: 5px;
+      height: 20px;
+      min-width: 14px;
+      border-radius: 5px;
+      background: linear-gradient(180deg, #8fb0ff, var(--accent));
+      border: 1px solid rgba(122, 162, 247, 0.6);
+      cursor: pointer;
+    }
+    .tl-bar.out { background: linear-gradient(180deg, #f2a65a, #e07b39); border-color: rgba(242, 166, 90, 0.6); }
+    .tl-bar.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); }
+    .tl-bar.out.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px #f2a65a; }
+    .tl-bar span {
+      position: absolute;
+      left: 8px;
+      top: 0;
+      line-height: 20px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #0f1117;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #tl-playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1.5px;
+      background: var(--green);
+      pointer-events: none;
+      z-index: 2;
+      display: none;
+    }
+    #tl-playhead::before {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: -4px;
+      border: 5px solid transparent;
+      border-top-color: var(--green);
+    }
+    #timeline-empty { padding: 26px 0 10px 150px; color: var(--dim); font-size: 12.5px; }
+    #animate-footer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .morph-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #c6cddb;
+      cursor: pointer;
+      user-select: none;
+    }
+    .morph-toggle input { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; margin: 0; }
+    #anim-count { margin-left: auto; color: var(--dim); font-size: 11.5px; }
+    /* inspector: build properties */
+    #insp-animate { display: none; }
+    #insp-animate .prop { margin-bottom: 11px; }
+    #insp-animate .prop label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+    #insp-animate select,
+    #insp-animate input[type="number"] {
+      width: 100%;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+    #insp-animate .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #insp-animate .anim-none { color: var(--dim); font-size: 12px; line-height: 1.55; margin: 4px 0 0; }
+    #insp-animate .anim-del {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #insp-animate .anim-del:hover { color: var(--danger); border-color: var(--danger); }
+    body[data-mode="animate"] #insp-slide { display: none; }
+    body[data-mode="animate"] #insp-animate { display: block; }
     /* ---------- sorter: full-screen deck grid ---------- */
     #sorter-panel {
       display: none;
@@ -1254,7 +1441,7 @@
     .mv-btn:hover { color: var(--text); border-color: var(--accent); }
     body:not([data-mode="edit"]) #sidebar,
     body:not([data-mode="edit"]) #main,
-    body:not([data-mode="edit"]) #inspector { display: none; }
+    body:not([data-mode="edit"]):not([data-mode="animate"]) #inspector { display: none; }
     /* ---------- slide grid navigator (G while presenting) ---------- */
     #slide-grid {
       position: fixed;
@@ -1540,12 +1727,57 @@
   </div>
 
   <aside id="inspector">
-    <h3>Slide</h3>
-    <div class="row"><span>Size</span><b id="insp-size">–</b></div>
-    <div class="row"><span>Position</span><b id="insp-pos">–</b></div>
-    <h3 class="sec">Content</h3>
-    <div class="row"><span>Shapes</span><b id="insp-shapes">–</b></div>
-    <div class="row"><span>Title</span><b id="insp-title">–</b></div>
+    <div id="insp-slide">
+      <h3>Slide</h3>
+      <div class="row"><span>Size</span><b id="insp-size">–</b></div>
+      <div class="row"><span>Position</span><b id="insp-pos">–</b></div>
+      <h3 class="sec">Content</h3>
+      <div class="row"><span>Shapes</span><b id="insp-shapes">–</b></div>
+      <div class="row"><span>Title</span><b id="insp-title">–</b></div>
+    </div>
+    <div id="insp-animate">
+      <h3>Build</h3>
+      <p id="anim-prop-empty" class="anim-none">Select a build on the timeline to edit its effect, timing and easing — or add one from the bar above.</p>
+      <div id="anim-prop-edit" style="display:none">
+        <div class="prop"><label>Effect</label>
+          <select id="anim-effect">
+            <option value="fade">Fade</option>
+            <option value="rise">Rise</option>
+            <option value="fly">Fly</option>
+            <option value="scale">Scale</option>
+            <option value="wipe">Wipe</option>
+            <option value="pop">Pop</option>
+          </select>
+        </div>
+        <div class="prop"><label>Direction</label>
+          <select id="anim-type">
+            <option value="in">Build in</option>
+            <option value="out">Build out</option>
+          </select>
+        </div>
+        <div class="prop"><label>Starts</label>
+          <select id="anim-start">
+            <option value="at time">At time</option>
+            <option value="on click">On click</option>
+            <option value="with previous">With previous</option>
+            <option value="after previous">After previous</option>
+          </select>
+        </div>
+        <div class="prop-grid">
+          <div class="prop"><label>Duration (s)</label><input id="anim-duration" type="number" min="0.1" max="10" step="0.1"></div>
+          <div class="prop"><label>Delay (s)</label><input id="anim-delay" type="number" min="0" max="30" step="0.1"></div>
+        </div>
+        <div class="prop"><label>Easing</label>
+          <select id="anim-easing">
+            <option value="linear">Linear</option>
+            <option value="ease-in">Ease in</option>
+            <option value="ease-out">Ease out</option>
+            <option value="ease-in-out">Ease in-out</option>
+          </select>
+        </div>
+        <button id="anim-prop-del" class="anim-del">Remove build</button>
+      </div>
+    </div>
   </aside>
   <section id="export-panel" class="mode-panel">
     <h2>Export</h2>
@@ -1567,6 +1799,45 @@
     <h2 id="ph-title">—</h2>
     <p class="panel-sub" id="ph-body">—</p>
   </section>
+  <!-- animate: build effects & timeline -->
+  <section id="animate-panel" class="mode-panel">
+    <div id="animate-subbar">
+      <span class="pane-kicker">Animate</span>
+      <span id="anim-slide-sub" class="pane-sub">–</span>
+      <span class="vdiv"></span>
+      <label for="anim-target">Object</label>
+      <select id="anim-target"></select>
+      <button id="anim-add-in" class="primary">+ Build In</button>
+      <button id="anim-add-out" title="Hide this object at the end of the slide">+ Build Out</button>
+      <button id="anim-remove" title="Remove selected build (Del)" disabled>Remove</button>
+      <span class="flex-spacer"></span>
+      <span class="seg" id="anim-speed">
+        <button data-speed="0.5">0.5×</button>
+        <button data-speed="1" class="on">1×</button>
+        <button data-speed="2">2×</button>
+      </span>
+      <button id="anim-play" class="primary" title="Play the builds for this slide">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+        <span>Play</span>
+      </button>
+    </div>
+    <div id="timeline">
+      <div id="timeline-ruler"></div>
+      <div id="timeline-body">
+        <div id="timeline-lanes"></div>
+        <div id="tl-playhead"></div>
+      </div>
+      <div id="timeline-empty">No builds yet — pick an object and press <b>+ Build In</b>.</div>
+    </div>
+    <div id="animate-footer">
+      <label class="morph-toggle" title="Morph this slide into the next one — matching shapes interpolate across the cut">
+        <input type="checkbox" id="anim-morph">
+        Morph to next slide
+      </label>
+      <span id="anim-count"></span>
+    </div>
+  </section>
+
   <section id="sorter-panel" class="mode-panel">
     <header id="sorter-head">
       <span class="sorter-label" id="sorter-count">Sorter</span>
@@ -1587,6 +1858,7 @@
   </div>
   <script src="slide_render.js"></script>
   <script src="stage_tools.js"></script>
+  <script src="animate.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
