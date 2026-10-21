@@ -9,6 +9,11 @@ let model = null;          // current PresentationModel projection
 let currentSlide = -1;     // selected slide index
 let filePath = null;
 
+// On iOS/iPadOS Tauri has no secondary-window routing (no UIScreen /
+// UIWindowScene access); AirPlay there is OS-level mirroring from the
+// Control Center, so we skip the dedicated audience window on mobile.
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+
 // ---------- helpers ----------
 function debounce(fn, ms) {
   let t = null;
@@ -339,7 +344,8 @@ async function refreshMonitorSelect() {
     monitors.forEach((m) => {
       const opt = document.createElement("option");
       opt.value = m.name;
-      opt.textContent = m.name + " · " + m.width + " × " + m.height + (m.is_primary ? " (primary)" : "");
+      const tag = m.is_primary ? " (primary)" : m.is_airplay ? " (AirPlay)" : " (external)";
+      opt.textContent = m.name + " · " + m.width + " × " + m.height + tag;
       sel.appendChild(opt);
     });
   } catch {
@@ -570,6 +576,13 @@ async function startPresentation() {
   if (!model || currentSlide < 0) { flash("open a deck first", "err"); return; }
   enterPresent();
   await refreshMonitorSelect();
+  if (IS_IOS) {
+    // No secondary-window routing on iOS — present on this screen and let
+    // the user mirror to an AirPlay receiver from the Control Center.
+    setPresentStatusRight(null);
+    flash("presenting — mirror to AirPlay from the Control Center");
+    return;
+  }
   try {
     const name = await invoke("open_audience_window", { monitorName: null });
     setPresentStatusRight(name);

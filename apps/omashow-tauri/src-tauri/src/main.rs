@@ -472,16 +472,102 @@ async fn save_file_dialog(app_handle: tauri::AppHandle) -> Result<Option<String>
 
 const AUDIENCE_LABEL: &str = "audience";
 
+/// Projection-target affinity for a monitor name. AirPlay receivers (Apple
+/// TV, the AirPlay Receiver app) and TV displays show up as external
+/// monitors; scoring by name lets secondary-display routing prefer them over
+/// ordinary second displays.
+pub fn airplay_affinity(name: &str) -> u8 {
+    let lower = name.to_ascii_lowercase();
+    let compact: String = lower.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    if compact.contains("airplay") {
+        100
+    } else if compact.contains("appletv") {
+        90
+    } else if tv_word(&lower) {
+        70
+    } else if lower.contains("display") {
+        40
+    } else {
+        0
+    }
+}
+
+/// True when "tv" stands as a word on its own ("Samsung TV", "Apple TV")
+/// but not inside an identifier ("DTV-1", "eDP-1").
+fn tv_word(lower: &str) -> bool {
+    lower.split(|c: char| !c.is_ascii_alphanumeric()).any(|w| w == "tv")
+}
+
+/// Among the non-primary monitors, the one most likely to be the projection
+/// target: highest AirPlay affinity first, ties broken by connection order.
+/// `None` when no secondary display exists (single-display setup).
+fn pick_external_index(monitors: &[(String, bool)]) -> Option<usize> {
+    let mut best: Option<(u8, usize)> = None;
+    for (i, (name, primary)) in monitors.iter().enumerate() {
+        if *primary {
+            continue;
+        }
+        let aff = airplay_affinity(name);
+        if best.map_or(true, |(b, _)| aff > b) {
+            best = Some((aff, i));
+        }
+    }
+    best.map(|(_, i)| i)
+}
+
 /// Audience display selection policy: an explicitly requested monitor name
-/// wins, then the first non-primary monitor, then the single (primary)
-/// monitor. Returns `None` when nothing matches or no display exists.
+/// wins; otherwise the best AirPlay / external monitor (an Apple TV or
+/// AirPlay receiver beats a plain second display, and the first secondary
+/// display wins on ties); then the single (primary) monitor. Returns `None`
+/// when nothing matches or no display exists.
 fn pick_audience_index(monitors: &[(String, bool)], requested: Option<&str>) -> Option<usize> {
     match requested {
         Some(name) => monitors.iter().position(|(n, _)| n == name),
-        None => monitors
-            .iter()
-            .position(|(_, primary)| !primary)
-            .or_else(|| (!monitors.is_empty()).then_some(0)),
+        None => pick_external_index(monitors).or_else(|| (!monitors.is_empty()).then_some(0)),
+    }
+}
+
+/// Window placement and chrome for the audience window, in logical (CSS)
+/// pixels. Secondary target: borderless, always-on-top fullscreen covering the
+/// monitor exactly (the position at the monitor origin is what makes the
+/// runtime resolve fullscreen for *this* display). Primary target (single
+/// display): a floating, decorated 16:9 preview at ~65% of the display width.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AudienceLayout {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub decorations: bool,
+    pub fullscreen: bool,
+    pub always_on_top: bool,
+}
+
+/// Pure geometry decision so secondary-display routing is unit-testable
+/// without hardware. `monitor` is already in logical pixels.
+pub fn audience_layout(monitor_x: f64, monitor_y: f64, monitor_w: f64, monitor_h: f64, target_is_primary: bool) -> AudienceLayout {
+    if !target_is_primary {
+        AudienceLayout {
+            x: monitor_x,
+            y: monitor_y,
+            width: monitor_w,
+            height: monitor_h,
+            decorations: false,
+            fullscreen: true,
+            always_on_top: true,
+        }
+    } else {
+        let width = (monitor_w * 0.65).clamp(480.0, 960.0);
+        let height = (width * 9.0 / 16.0).round();
+        AudienceLayout {
+            x: f64::NAN, // OS-placed (no explicit position)
+            y: f64::NAN,
+            width,
+            height,
+            decorations: true,
+            fullscreen: false,
+            always_on_top: true,
+        }
     }
 }
 
@@ -490,6 +576,11 @@ fn pick_audience_index(monitors: &[(String, bool)], requested: Option<&str>) -> 
 struct MonitorInfo {
     name: String,
     is_primary: bool,
+    /// A secondary display (not the built-in / primary screen).
+    is_external: bool,
+    /// Looks like an AirPlay / TV projection target by name (Apple TV,
+    /// AirPlay receiver, "… TV"). Heuristic — the name comes from the OS.
+    is_airplay: bool,
     width: u32,
     height: u32,
     x: i32,
@@ -510,9 +601,13 @@ fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> {
             let scale = m.scale_factor();
             let size = *m.size();
             let pos = *m.position();
+            let name = m.name().cloned().unwrap_or_else(|| "monitor".to_string());
+            let is_primary = Some(name.clone()) == primary;
             MonitorInfo {
-                name: m.name().cloned().unwrap_or_else(|| "monitor".to_string()),
-                is_primary: m.name().cloned() == primary,
+                is_primary,
+                is_external: !is_primary,
+                is_airplay: airplay_affinity(&name) >= 70,
+                name,
                 width: (size.width as f64 / scale).round() as u32,
                 height: (size.height as f64 / scale).round() as u32,
                 x: (pos.x as f64 / scale).round() as i32,
@@ -523,10 +618,13 @@ fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> {
 }
 
 /// Opens an audience projection window. When a secondary monitor exists (or is
-/// explicitly requested), the window is borderless, fullscreen, and always on top,
-/// so focus changes on the primary monitor never hide or move it while the
-/// presenter multitasks in the console. On a single display (e.g. testing locally),
-/// it opens as a floating, decorated preview window so both views are visible.
+/// explicitly requested) — including AirPlay receivers such as Apple TV or the
+/// AirPlay Receiver app, which the OS reports as external displays — the
+/// window is borderless, fullscreen, and always on top on that display, so
+/// focus changes on the primary monitor never hide or move it while the
+/// presenter multitasks in the console. On a single display (e.g. testing
+/// locally), it opens as a floating, decorated preview window so both views
+/// are visible.
 #[tauri::command]
 fn open_audience_window(app: tauri::AppHandle, monitor_name: Option<String>) -> Result<String, String> {
     if let Some(existing) = app.get_webview_window(AUDIENCE_LABEL) {
@@ -552,40 +650,32 @@ fn open_audience_window(app: tauri::AppHandle, monitor_name: Option<String>) -> 
     })?;
     let monitor = &monitors[index];
     let is_primary = specs[index].1;
-    let scale = monitor.scale_factor();
+    let scale = monitor.scale_factor().max(0.1);
     let size = *monitor.size();
     let pos = *monitor.position();
 
-    let builder = WebviewWindowBuilder::new(&app, AUDIENCE_LABEL, tauri::WebviewUrl::App("audience.html".into()));
+    let layout = audience_layout(
+        pos.x as f64 / scale,
+        pos.y as f64 / scale,
+        size.width as f64 / scale,
+        size.height as f64 / scale,
+        is_primary,
+    );
 
-    if !is_primary {
-        builder
-            .title("Omashow — Audience")
-            .position(pos.x as f64 / scale, pos.y as f64 / scale)
-            .inner_size(size.width as f64 / scale, size.height as f64 / scale)
-            .decorations(false)
-            .fullscreen(true)
-            .minimizable(false)
-            .maximizable(false)
-            .resizable(false)
-            .always_on_top(true)
-            .build()
-            .map_err(|e| e.to_string())?;
-    } else {
-        let preview_w = (size.width as f64 / scale * 0.65).clamp(480.0, 960.0);
-        let preview_h = (preview_w * 9.0 / 16.0).round();
-        builder
-            .title("Omashow — Audience Preview")
-            .inner_size(preview_w, preview_h)
-            .decorations(true)
-            .fullscreen(false)
-            .minimizable(true)
-            .maximizable(true)
-            .resizable(true)
-            .always_on_top(true)
-            .build()
-            .map_err(|e| e.to_string())?;
+    let mut builder = WebviewWindowBuilder::new(&app, AUDIENCE_LABEL, tauri::WebviewUrl::App("audience.html".into()));
+    builder = builder
+        .title(if layout.fullscreen { "Omashow — Audience" } else { "Omashow — Audience Preview" })
+        .inner_size(layout.width, layout.height)
+        .decorations(layout.decorations)
+        .fullscreen(layout.fullscreen)
+        .minimizable(!layout.fullscreen)
+        .maximizable(!layout.fullscreen)
+        .resizable(!layout.fullscreen)
+        .always_on_top(layout.always_on_top);
+    if layout.x.is_finite() {
+        builder = builder.position(layout.x, layout.y);
     }
+    builder.build().map_err(|e| e.to_string())?;
 
     if let Some(main_win) = app.get_webview_window("main") {
         let _ = main_win.set_focus();
@@ -604,7 +694,7 @@ fn close_audience_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::pick_audience_index;
+    use super::{airplay_affinity, audience_layout, pick_audience_index, pick_external_index};
 
     fn names(names: &[&str], primary: usize) -> Vec<(String, bool)> {
         names
@@ -639,5 +729,89 @@ mod tests {
         assert_eq!(pick_audience_index(&m, Some("DP-9")), None);
         let empty: Vec<(String, bool)> = vec![];
         assert_eq!(pick_audience_index(&empty, None), None);
+    }
+
+    #[test]
+    fn airplay_names_score_higher_than_plain_displays() {
+        assert_eq!(airplay_affinity("AirPlay Display"), 100);
+        assert_eq!(airplay_affinity("Kitchen Apple TV"), 90);
+        assert_eq!(airplay_affinity("AppleTV"), 90);
+        assert_eq!(airplay_affinity("Apple-TV 4K"), 90);
+        assert_eq!(airplay_affinity("Samsung TV"), 70);
+        assert_eq!(airplay_affinity("Display 2"), 40);
+        assert_eq!(airplay_affinity("HDMI-A-1"), 0);
+        assert_eq!(airplay_affinity("eDP-1"), 0);
+        // "tv" must not match inside identifiers
+        assert_eq!(airplay_affinity("DTV-1"), 0);
+    }
+
+    #[test]
+    fn airplay_receiver_wins_over_other_external_displays() {
+        let m = names(&["eDP-1", "HDMI-A-1", "Kitchen Apple TV"], 0);
+        assert_eq!(pick_external_index(&m), Some(2));
+        assert_eq!(pick_audience_index(&m, None), Some(2));
+
+        let m = names(&["eDP-1", "DP-2", "AirPlay Display"], 0);
+        assert_eq!(pick_audience_index(&m, None), Some(2));
+    }
+
+    #[test]
+    fn external_pick_falls_back_to_first_secondary_on_tie() {
+        let m = names(&["eDP-1", "HDMI-A-1", "DP-2"], 0);
+        assert_eq!(pick_external_index(&m), Some(1));
+
+        let single = names(&["eDP-1"], 0);
+        assert_eq!(pick_external_index(&single), None);
+        assert_eq!(pick_audience_index(&single, None), Some(0));
+    }
+
+    #[test]
+    fn secondary_monitor_covers_display_exactly() {
+        let l = audience_layout(1920.0, 0.0, 2560.0, 1440.0, false);
+        assert_eq!((l.x, l.y), (1920.0, 0.0));
+        assert_eq!((l.width, l.height), (2560.0, 1440.0));
+        assert!(!l.decorations);
+        assert!(l.fullscreen);
+        assert!(l.always_on_top);
+    }
+
+    #[test]
+    fn secondary_monitor_left_of_primary_keeps_negative_origin() {
+        let l = audience_layout(-1920.0, 0.0, 1920.0, 1080.0, false);
+        assert_eq!((l.x, l.y), (-1920.0, 0.0));
+        assert_eq!((l.width, l.height), (1920.0, 1080.0));
+        assert!(l.fullscreen);
+    }
+
+    #[test]
+    fn secondary_hidpi_uses_logical_coordinates() {
+        // 4K monitor at 2x scale: physical (3840,0) 3840x2160 -> logical (1920,0) 1920x1080.
+        let l = audience_layout(1920.0, 0.0, 1920.0, 1080.0, false);
+        assert_eq!((l.x, l.y), (1920.0, 0.0));
+        assert_eq!((l.width, l.height), (1920.0, 1080.0));
+    }
+
+    #[test]
+    fn single_display_preview_is_16_9_and_bounded() {
+        // 1920x1080 primary: 65% width would be 1248, clamped to 960 -> 540 tall.
+        let l = audience_layout(0.0, 0.0, 1920.0, 1080.0, true);
+        assert_eq!((l.width, l.height), (960.0, 540.0));
+        assert!(l.decorations);
+        assert!(!l.fullscreen);
+        assert!(l.always_on_top);
+        assert!(!l.x.is_finite()); // OS-placed, no explicit position
+    }
+
+    #[test]
+    fn small_display_preview_respects_minimum() {
+        // 640x480: 65% = 416 -> clamped up to 480.
+        let l = audience_layout(0.0, 0.0, 640.0, 480.0, true);
+        assert_eq!((l.width, l.height), (480.0, 270.0));
+    }
+
+    #[test]
+    fn ultrawide_preview_stays_16_9() {
+        let l = audience_layout(0.0, 0.0, 3840.0, 1080.0, true);
+        assert_eq!((l.width, l.height), (960.0, 540.0));
     }
 }
