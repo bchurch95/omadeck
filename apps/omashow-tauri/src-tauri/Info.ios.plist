@@ -4,8 +4,10 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>OmaDeck</string>
-	<key>UIRequiresFullScreen</key>
-	<true/>
+	<!-- UIRequiresFullScreen intentionally absent: it would opt the app out of
+	     iPad Split View / Slide Over. A deck presented in Slide Over stays fully
+	     live (timers, autoplay, navigation) and mirrors to an AirPlay receiver
+	     via Control Center, so the presenter can multitask beside the show. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
