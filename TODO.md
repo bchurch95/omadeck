@@ -40,7 +40,7 @@
 ## Milestone 6: Image Extraction & Multi-Vendor Corpus Testing (Complete)
 - [x] Support `<p:pic>` shape extraction and map embedded media relationships (`ppt/media/*`).
 - [x] Render embedded slide pictures inside the Tauri slide canvas. (Editor canvas, filmstrip thumbnails, presenter console and audience window; `ShapeInfo.pic` carries format + data URI, e2e-verified under Xvfb.)
-- [x] Add multi-vendor test suite in `crates/omashow-core/tests/corpus.rs` verifying decks from Google Slides, M365, and Keynote. (8 Apache-2.0 Apache POI fixtures: M365 PowerPoint 2007–2016 Windows + macOS, LibreOffice 5–25; two SmartArt/OLE fixtures pinned as `KNOWN_REJECTIONS` with a stable non-panicking error contract.)
+- [x] Add multi-vendor test suite in `crates/omashow-core/tests/corpus.rs` verifying decks from Google Slides, M365, and Keynote. (8 Apache-2.0 Apache POI fixtures: M365 PowerPoint 2007–2016 Windows + macOS, LibreOffice 5–25; one legacy-OLE fixture pinned as `KNOWN_REJECTIONS` with a stable non-panicking error contract.)
 - [x] Add negative tests ensuring corrupt PPTX files fail gracefully with typed `Result` errors. (6 cases in `tests/corrupt.rs`: empty file, garbage bytes, truncated zip, missing `[Content_Types].xml`, invalid content-types XML, corrupted slide XML.)
 
 ## Milestone 7: Presenter Stage Tools & Export Engine (PDF & Web)
@@ -91,7 +91,7 @@
 - [ ] Background AirPlay video stream mode allowing complete app minimization while keeping audience slides active. (Platform constraint: when the app is backgrounded, WKWebView JavaScript is suspended and screen mirroring stops showing the app — Tauri v2 has no native background-media path. Needs a native iOS plugin with `UIBackgroundModes` + an `AVPlayer`/`AVSampleBufferDisplayLayer` stream to the AirPlay receiver; tracked as blocked on native code, not achievable in this stack.)
 
 ## Stretch: office-toolkit reader gaps & vendor coverage (tracked, not blocking)
-- [ ] SmartArt diagrams: office-toolkit mis-parses `dgm:relIds` (diagram parts) as chart relationships and rejects the package. Fix upstream (or vendor + patch) so SmartArt slides open; then promote `m365_smartart.bin` from `KNOWN_REJECTIONS` to `FIXTURES`.
+- [x] SmartArt diagrams: office-toolkit mis-parses `dgm:relIds` (diagram parts) as chart relationships and rejects the package. Fix upstream (or vendor + patch) so SmartArt slides open; then promote `m365_smartart.bin` from `KNOWN_REJECTIONS` to `FIXTURES`. (Vendored office-toolkit 0.24.1 under `vendor/powerpoint-ooxml` + workspace `[patch.crates-io]`: `parse_chart` now returns `Option<Chart>` (None when the part is a SmartArt diagram with no `c:chart` root), `Slide` gains `smartarts: Vec<SmartArtShape>` (id/name/offset/extent only), the slide XML patcher preserves diagram parts and emits empty `dgm:relIds` placeholders, and the `Shape::SmartArt` variant is handled in every `omashow-core` match site. `m365_smartart.bin` promoted to `FIXTURES` (1 slide); opens, inspects, and resaves losslessly.)
 - [ ] Legacy OLE objects / `mc:AlternateContent`: same rejection path (see `m365_bug64693.bin`). Model or gracefully skip `p:oleObj` so the rest of the slide still renders.
 - [ ] Genuine Google Slides and Keynote export fixtures: requires licensed/first-party sample decks (no public corpus found); add once available.
 

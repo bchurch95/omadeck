@@ -439,6 +439,27 @@ fn shape_info(shape: &Shape, ctx: &GroupContext, geom: Option<&PhMap>) -> ShapeI
             connector: None,
             children: None,
         },
+        Shape::SmartArt(s) => ShapeInfo {
+            id: s.id,
+            name: s.name.clone(),
+            kind: "smartart",
+            placeholder: None,
+            bounds: Some(ctx.map_box(
+                s.offset_emu.0,
+                s.offset_emu.1,
+                s.extent_emu.0,
+                s.extent_emu.1,
+            )),
+            text: None,
+            fill: None,
+            line: None,
+            runs: Vec::new(),
+            pic: None,
+            media: None,
+            table: None,
+            connector: None,
+            children: None,
+        },
         Shape::Group(g) => {
             // Placeholders only inherit from the layout/master at the
             // top level of a slide, so nested shapes resolve without the table.

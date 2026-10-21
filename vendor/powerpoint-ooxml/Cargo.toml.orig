@@ -1,0 +1,19 @@
+[package]
+name = "powerpoint-ooxml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "Reading and writing of the PresentationML format (.pptx)."
+keywords = ["pptx", "powerpoint", "ooxml", "office"]
+categories = ["parser-implementations", "encoding"]
+
+[dependencies]
+xml-core.workspace = true
+opc.workspace = true
+drawing.workspace = true
+chart.workspace = true
+thiserror.workspace = true

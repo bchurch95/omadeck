@@ -4,9 +4,9 @@
 //! 2007–2016 (Windows + macOS) and LibreOffice 5–25. See
 //! `tests/fixtures/README.md` for provenance and vendor-coverage notes.
 //!
-//! Files the upstream office-toolkit reader cannot yet parse (SmartArt
-//! diagrams, legacy OLE objects) are tracked in `KNOWN_REJECTIONS`: they
-//! must fail with a stable, typed error — never a panic.
+//! Files the upstream office-toolkit reader cannot yet parse (legacy OLE
+//! objects) are tracked in `KNOWN_REJECTIONS`: they must fail with a
+//! stable, typed error — never a panic.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -22,15 +22,15 @@ const FIXTURES: &[(&str, usize)] = &[
     ("tests/fixtures/m365_sampleshow.bin", 2),
     ("tests/fixtures/m365_artistic_effects.bin", 2),
     ("tests/fixtures/m365_mac_key02.bin", 1),
+    ("tests/fixtures/m365_smartart.bin", 1),
     ("tests/fixtures/libreoffice_100610.bin", 17),
     ("tests/fixtures/libreoffice_picture_transparency.bin", 4),
 ];
 
 /// (fixture, expected rejection message fragment). office-toolkit has no
-/// model for SmartArt diagram parts or legacy OLE objects yet; the reader
-/// must keep failing cleanly instead of panicking or silently accepting.
+/// model for legacy OLE objects yet; the reader must keep failing cleanly
+/// instead of panicking or silently accepting.
 const KNOWN_REJECTIONS: &[(&str, &str)] = &[
-    ("tests/fixtures/m365_smartart.bin", "not declared"),
     ("tests/fixtures/m365_bug64693.bin", "not declared"),
 ];
 

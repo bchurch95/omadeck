@@ -208,6 +208,7 @@ pub fn reorder_shape_z_order(
             Shape::Connector(c) => c.id == shape_id,
             Shape::Table(t) => t.id == shape_id,
             Shape::Media(m) => m.id == shape_id,
+            Shape::SmartArt(s) => s.id == shape_id,
         })
         .ok_or(Error::ShapeNotFound(shape_id))?;
 
@@ -270,6 +271,7 @@ pub fn move_shape(
             Shape::Connector(c) => c.id == shape_id,
             Shape::Table(t) => t.id == shape_id,
             Shape::Media(m) => m.id == shape_id,
+            Shape::SmartArt(s) => s.id == shape_id,
         };
         if !is_target {
             continue;
@@ -282,6 +284,7 @@ pub fn move_shape(
             Shape::Group(g) => shift_offset_emu(&mut g.offset_emu, dx, dy),
             Shape::Table(t) => shift_offset_emu(&mut t.offset_emu, dx, dy),
             Shape::Media(m) => shift_offset_emu(&mut m.offset_emu, dx, dy),
+            Shape::SmartArt(s) => shift_offset_emu(&mut s.offset_emu, dx, dy),
         }
         moved = true;
         break;
@@ -329,6 +332,7 @@ pub fn delete_shape(
             Shape::Connector(c) => c.id == shape_id,
             Shape::Table(t) => t.id == shape_id,
             Shape::Media(m) => m.id == shape_id,
+            Shape::SmartArt(s) => s.id == shape_id,
         })
         .ok_or(Error::ShapeNotFound(shape_id))?;
     let shape = slide.shapes.remove(idx);
@@ -340,6 +344,7 @@ pub fn delete_shape(
         Shape::Connector(c) => c.name,
         Shape::Table(t) => t.name,
         Shape::Media(m) => m.name,
+        Shape::SmartArt(s) => s.name,
     })
 }
 

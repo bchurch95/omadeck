@@ -207,3 +207,30 @@
 - [ ] [Critic] Clone the shape vectors under the Mutex lock and run detect_morph outside the critical section to avoid blocking the UI thread on large decks.
 - [ ] [Critic] Add a frontend stub (e.g., a morph-preview panel or a console.log of MorphResult) so the Tauri command is exercised end-to-end before the full animation layer lands.
 - [ ] [Critic] Verify the nearest-centroid fallback uses an epsilon tolerance (e.g., 100 EMU ≈ 0.01 mm) when comparing distances to prevent pairing instability from sub-pixel rounding.
+
+### 🔍 Architect & Critic Feedback (Commit df13bc5 - Score: 6/10)
+- [ ] [Critic] Verify that Animation Engine & Timeline implementation (timeline ruler, morph interpolation, build inspector wiring) actually exists in the codebase before accepting the [x] mark in TODO.md; add a verification commit or revert the checkbox if incomplete.
+- [ ] [Critic] Re-prioritise: confirm whether any Milestone 8 core items (presenter console, slide sorter, stage tools) remain incomplete before committing to the 'stretch' touch-gesture task.
+- [ ] [Critic] In CURRENT_TASK.md, resolve the `#slide-canvas` / `#preview-wrap` ambiguity by naming the single correct DOM target for touch listeners.
+- [ ] [Critic] Add `touch-action: none` and `overscroll-behavior: contain` to the slide viewport CSS as a prerequisite step in the task plan.
+- [ ] [Critic] Specify a visual feedback affordance (e.g., 150 ms edge-glow or slide-peek) for swipe gestures in the task description.
+- [ ] [Critic] Add an accessibility sub-task: ensure ArrowLeft/ArrowRight keyboard navigation and ARIA `aria-live` announcements coexist with the new touch handlers.
+- [ ] [Critic] Replace the arbitrary '50px' threshold with a reference to a configurable constant (e.g., `SWIPE_THRESHOLD_PX = 60`) and note platform-specific calibration for high-DPI touchscreens.
+
+### 🔍 Architect & Critic Feedback (Commit 0a64bc5 - Score: 7/10)
+- [ ] [Critic] Add a touchcancel listener on #slide-canvas that resets touchNav.state to null to prevent stale gesture state after OS interruptions.
+- [ ] [Critic] Guard touchCentroid() against an empty touches collection (early return or length check) to avoid NaN propagation.
+- [ ] [Critic] Introduce a generation counter or timestamp on touchNav.state so that a new touchstart invalidates any in-flight resolution from the previous gesture.
+- [ ] [Critic] Add navigator.vibrate(10) or Web Haptics API call on successful swipe-advance and notes-toggle for iPadOS tactile feedback.
+- [ ] [Critic] Add a subtle CSS transition (e.g., 150 ms opacity pulse) on the speaker-notes bar when toggled via two-finger tap so the action is visually confirmed.
+- [ ] [Critic] Scope touch-action: none to non-presenting mode only (toggle via a class on #slide-canvas) so the OS pinch-to-zoom remains available in the editor view.
+- [ ] [Critic] Add an aria-live='polite' region that announces 'Slide N of M' and 'Notes shown/hidden' when touch gestures fire, for VoiceOver accessibility.
+- [ ] [Critic] Add a one-time onboarding hint (fading chevron pair at canvas edges) on first touch interaction to discover swipe navigation.
+
+### 🔍 Architect & Critic Feedback (Commit 2ed616b - Score: 4/10)
+- [ ] [Critic] Re-tag commit 2ed616bb as chore(ios) or split the plist change into its own commit separate from the CURRENT_TASK.md / TODO.md planning updates.
+- [ ] [Critic] Add a CI assertion (e.g., a small Rust or shell test) that parses Info.ios.plist and fails if UIRequiresFullScreen is true or missing, preventing silent regression of Split View support.
+- [ ] [Critic] Verify in the plist diff that UIRequiresFullScreen is explicitly set to <false/> and that UISupportedInterfaceOrientations~ipad includes both UIInterfaceOrientationPortrait and UIInterfaceOrientationLandscapeLeft/Right.
+- [ ] [Critic] Add a responsive CSS breakpoint (≤ 480 px) in the Tauri frontend so the 7-mode toolbar collapses to an icon-only or hamburger layout for iPad Slide Over / narrow Split View panes.
+- [ ] [Critic] Confirm that `omashow-cli inspect` subcommand exists; if not, add it or update CURRENT_TASK.md step 1 to use `cargo test -p omashow-core -- corpus` as the reproduction path instead.
+- [ ] [Critic] Move the 'do not exclude supervisor artifacts' directive from CURRENT_TASK.md into a .gitattributes or a pre-commit hook so it is enforced mechanically rather than by convention.
